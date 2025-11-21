@@ -116,150 +116,396 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
       }
     }
 
+  @override
+  Widget build(BuildContext context) {
+    final isFavorito = _fav.isFavorited(veiculoId);
+
+    List<String> fotos = [];
+    if (veiculo['fotos'] is List) {
+      fotos = List<String>.from(veiculo['fotos'].whereType<String>());
+    }
+    if (fotos.isEmpty && veiculo['fotos_thumb'] is List) {
+      fotos = List<String>.from(veiculo['fotos_thumb'].whereType<String>());
+    }
+
+    String preco = '-';
+    final precoRaw = veiculo['preco'];
+    if (precoRaw is num) {
+      preco = 'R\$ ' + precoRaw.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m)=>'.');
+    } else if (precoRaw != null) {
+      preco = precoRaw.toString();
+    }
+
+    String km = '-';
+    final kmRaw = veiculo['km'];
+    if (kmRaw is num) {
+      km = kmRaw.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m)=>'.');
+    }
+
+    String titulo = (veiculo['titulo'] ?? '') as String;
+    if (titulo.trim().isEmpty) {
+      final parts = [veiculo['marca'], veiculo['modelo'], veiculo['versao']]
+          .whereType<String>()
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) titulo = parts.join(' ');
+    }
+
+    final specItems = <_InfoItem>[
+      _InfoItem('Marca', veiculo['marca']),
+      _InfoItem('Modelo', veiculo['modelo']),
+      _InfoItem('Versão', veiculo['versao']),
+      _InfoItem('Ano Fab.', veiculo['ano_fab']),
+      _InfoItem('KM', km),
+      _InfoItem('Cor', veiculo['cor']),
+      _InfoItem('Carroceria', veiculo['carroceria']),
+      _InfoItem('Condição', veiculo['condicao']),
+      _InfoItem('Combustível', veiculo['combustivel']),
+      _InfoItem('Câmbio', veiculo['cambio']),
+      _InfoItem('Portas', veiculo['num_portas']),
+      _InfoItem('Direção', veiculo['direcao']),
+      _InfoItem('Faróis', veiculo['farois']),
+      _InfoItem('Situação', veiculo['situacao_veiculo']),
+      _InfoItem('Garantia', veiculo['garantia']),
+      _InfoItem('Airbags', veiculo['airbags']),
+    ];
+
+    final boolFlags = <_FlagItem>[
+      _FlagItem('Ar-condicionado', veiculo['ar_condicionado']),
+      _FlagItem('Vidros dianteiros', veiculo['vidros_dianteiros']),
+      _FlagItem('Vidros traseiros', veiculo['vidros_traseiros']),
+      _FlagItem('Travas elétricas', veiculo['travas_eletricas']),
+      _FlagItem('Bancos couro', veiculo['bancos_couro']),
+      _FlagItem('Multimídia', veiculo['multimidia']),
+      _FlagItem('Rodas liga', veiculo['rodas_liga']),
+      _FlagItem('ABS', veiculo['abs']),
+      _FlagItem('Estabilidade', veiculo['controle_estabilidade']),
+      _FlagItem('Sensor/Câmera', veiculo['sensor_estacionamento']),
+      _FlagItem('Manual+Chave', veiculo['manual_chave']),
+      _FlagItem('IPVA pago', veiculo['ipva_pago']),
+    ];
+
+    final pagamentos = <String>[];
+    if (veiculo['pagamentos'] is List) {
+      pagamentos.addAll(veiculo['pagamentos'].whereType<String>());
+    } else if (veiculo['pagamento'] is String) {
+      final raw = (veiculo['pagamento'] as String).trim();
+      if(raw.contains(',')) {
+        pagamentos.addAll(raw.split(',').map((e)=>e.trim()).where((e)=>e.isNotEmpty));
+      } else if(raw.isNotEmpty) {
+        pagamentos.add(raw);
+      }
+    }
+
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Detalhes'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Detalhes do Veículo'),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(isFavorito ? Icons.favorite : Icons.favorite_border),
+            onPressed: () async {
+              try {
+                if(isFavorito){
+                  await _fav.removeRemote(veiculoId);
+                } else {
+                  await _fav.addRemote(veiculoId, veiculo);
+                }
+                if(mounted) setState((){});
+              } catch (error) {
+                if(mounted){
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Falha ao atualizar favoritos: $error')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
           CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              // Header com imagem e preço overlay
+              SliverAppBar(
+                expandedHeight: 300,
+                pinned: true,
+                backgroundColor: theme.colorScheme.primary,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      _GalleryHeader(fotos: fotos, titulo: titulo, onOpen: (i){
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => _FullScreenGallery(fotos: fotos, initialIndex: i),
-                        ));
-                      }),
-                      const SizedBox(height: 16),
-                      _PriceHeader(titulo: titulo, preco: preco, pagamentos: pagamentos),
-                      const SizedBox(height: 16),
-                      _ActionButtons(
-                        favorito: isFavorito,
-                        onToggleFavorito: () async {
-                          try {
-                            if(isFavorito){
-                              await _fav.removeRemote(veiculoId);
-                            } else {
-                              await _fav.addRemote(veiculoId, veiculo);
-                            }
-                            if(mounted) setState((){}); // força rebuild estado ícone
-                          } catch (error) {
-                            if(mounted){
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Falha ao atualizar favoritos: $error')),
-                              );
-                            }
-                          }
-                        },
-                        onContato: () async {
-                          final anuncioId = (veiculo['id'] ?? veiculo['uuid'] ?? veiculo['codigo'])?.toString();
-                          if (anuncioId != null && anuncioId.isNotEmpty) {
-                            await AnalyticsService.I.logContact(anuncioId: anuncioId);
-                          }
-                          
-                          final whatsapp = veiculo['whatsapp']?.toString();
-                          
-                          if (whatsapp != null && whatsapp.isNotEmpty) {
-                            // Remove caracteres não numéricos
-                            final cleanNumber = whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
-                            
-                            // Para Brasil, remove o 0 do DDD se existir
-                            final formattedNumber = cleanNumber.startsWith('55') 
-                              ? cleanNumber 
-                              : '55$cleanNumber';
-                            
-                            final whatsappUrl = 'https://wa.me/$formattedNumber';
-                            
-                            try {
-                              final uri = Uri.parse(whatsappUrl);
-                              // Tenta abrir diretamente sem verificar canLaunchUrl
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            } catch (e) {
-                              print('Erro ao abrir WhatsApp: $e'); // Debug
-                              // Se falhar, tenta com canLaunchUrl como fallback
-                              try {
-                                final uri = Uri.parse(whatsappUrl);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('WhatsApp não está instalado ou não pode ser aberto'))
-                                  );
-                                }
-                              } catch (e2) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Erro ao abrir WhatsApp: $e2'))
-                                );
-                              }
-                            }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Contato do vendedor não disponível'))
-                            );
-                          }
-                        },
-                        onCompartilhar: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Compartilhar (implementar share_plus)')));
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      if (veiculo['descricao'] != null && (veiculo['descricao'] as String).trim().isNotEmpty)
-                        _SectionCard(
-                          title: 'Descrição',
-                          child: Text(veiculo['descricao'], style: const TextStyle(fontSize: 14, height: 1.4)),
-                        ),
-                      _SectionCard(
-                        title: 'Especificações',
-                        child: Wrap(
-                          spacing: 12,
-                          runSpacing: 10,
-                          children: specItems.where((i) => i.value != null && i.value.toString().trim().isNotEmpty && i.value.toString()!='null')
-                              .map((i) => _SpecChip(item: i)).toList(),
-                        ),
-                      ),
-                      _SectionCard(
-                        title: 'Itens / Equipamentos',
-                        child: boolFlags.any((f) => f.value == true)
-                            ? Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: boolFlags.where((f) => f.value == true).map((f) => Chip(
-                            avatar: const Icon(Icons.check, size: 16, color: Colors.white),
-                            label: Text(f.label),
-                            backgroundColor: Colors.green.shade600,
-                            labelStyle: const TextStyle(color: Colors.white),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          )).toList(),
+                      if (fotos.isNotEmpty)
+                        Image.network(
+                          fotos.first,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
+                          ),
                         )
-                            : const Text('Nenhum item informado', style: TextStyle(color: Colors.grey)),
-                      ),
-                      _SectionCard(
-                        title: 'Localização',
-                        child: Text(_formatLocal(veiculo['cidade'], veiculo['estado'], veiculo['cep']), style: const TextStyle(fontSize: 14)),
-                      ),
-                      if (veiculo['criado_em'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Text('Publicado em: ' + veiculo['criado_em'].toString(), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      else
+                        Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
                         ),
-                      const SizedBox(height: 80),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              titulo,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              preco,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (pagamentos.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                children: pagamentos.map((p) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    p,
+                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                )).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
+              // Galeria de imagens (se múltiplas)
+              if (fotos.length > 1)
+                SliverToBoxAdapter(
+                  child: Container(
+                    height: 100,
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: fotos.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) => GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => _FullScreenGallery(fotos: fotos, initialIndex: index),
+                          ));
+                        },
+                        child: Container(
+                          width: 120,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.3)),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              fotos[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image, size: 40),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              // Conteúdo principal
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Descrição
+                    if (veiculo['descricao'] != null && (veiculo['descricao'] as String).trim().isNotEmpty)
+                      _ModernCard(
+                        title: 'Descrição',
+                        icon: Icons.description,
+                        child: Text(
+                          veiculo['descricao'],
+                          style: const TextStyle(fontSize: 16, height: 1.5),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    // Especificações
+                    _ModernCard(
+                      title: 'Especificações',
+                      icon: Icons.settings,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: specItems
+                            .where((i) => i.value != null && i.value.toString().trim().isNotEmpty && i.value.toString() != 'null')
+                            .map((i) => _SpecChip(item: i))
+                            .toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Equipamentos
+                    _ModernCard(
+                      title: 'Equipamentos',
+                      icon: Icons.build,
+                      child: boolFlags.any((f) => f.value == true)
+                          ? Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: boolFlags.where((f) => f.value == true).map((f) => Chip(
+                          avatar: const Icon(Icons.check, size: 16, color: Colors.white),
+                          label: Text(f.label),
+                          backgroundColor: Colors.green.shade600,
+                          labelStyle: const TextStyle(color: Colors.white),
+                        )).toList(),
+                      )
+                          : const Text('Nenhum equipamento informado', style: TextStyle(color: Colors.grey)),
+                    ),
+                    const SizedBox(height: 16),
+                    // Localização
+                    _ModernCard(
+                      title: 'Localização',
+                      icon: Icons.location_on,
+                      child: Text(
+                        _formatLocal(veiculo['cidade'], veiculo['estado'], veiculo['cep']),
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Data de publicação
+                    if (veiculo['criado_em'] != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Publicado em: ${veiculo['criado_em']}',
+                          style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                    const SizedBox(height: 100), // Espaço para botões flutuantes
+                  ]),
+                ),
+              ),
             ],
+          ),
+          // Botões flutuantes
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final anuncioId = (veiculo['id'] ?? veiculo['uuid'] ?? veiculo['codigo'])?.toString();
+                      if (anuncioId != null && anuncioId.isNotEmpty) {
+                        await AnalyticsService.I.logContact(anuncioId: anuncioId);
+                      }
+
+                      final whatsapp = veiculo['whatsapp']?.toString();
+
+                      if (whatsapp != null && whatsapp.isNotEmpty) {
+                        final cleanNumber = whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
+                        final formattedNumber = cleanNumber.startsWith('55') ? cleanNumber : '55$cleanNumber';
+                        final whatsappUrl = 'https://wa.me/$formattedNumber';
+
+                        try {
+                          final uri = Uri.parse(whatsappUrl);
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (e) {
+                          try {
+                            final uri = Uri.parse(whatsappUrl);
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('WhatsApp não está instalado'))
+                              );
+                            }
+                          } catch (e2) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Erro ao abrir WhatsApp: $e2'))
+                            );
+                          }
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Contato do vendedor não disponível'))
+                        );
+                      }
+                    },
+                    icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
+                    label: const Text('Contato'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FloatingActionButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Compartilhar (implementar share_plus)'))
+                    );
+                  },
+                  backgroundColor: theme.colorScheme.primary,
+                  child: const Icon(Icons.share),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
   }
 
   String _formatLocal(dynamic cidade, dynamic estado, dynamic cep) {
@@ -310,83 +556,57 @@ class _SpecChip extends StatelessWidget {
 }
 
 // ---------- UI Auxiliares estilizadas ----------
-class _SectionCard extends StatelessWidget {
-  final String title; final Widget child;
-  const _SectionCard({required this.title, required this.child});
-  @override
-  Widget build(BuildContext context){
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-  padding: const EdgeInsets.fromLTRB(16,14,16,16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(.35),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children:[
-          Row(
-            children: [
-              Container(width:4,height:18, decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(4))),
-              const SizedBox(width:8),
-              Text(title, style: TextStyle(fontSize:16,fontWeight: FontWeight.w600,color: theme.colorScheme.onSurface)),
-            ],
-          ),
-          const SizedBox(height:12),
-          child,
-        ],
-      ),
-    );
-  }
-}
+class _ModernCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+  const _ModernCard({required this.title, required this.icon, required this.child});
 
-class _PriceHeader extends StatelessWidget {
-  final String titulo; final String preco; final List<String> pagamentos;
-  const _PriceHeader({required this.titulo, required this.preco, required this.pagamentos});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            Color.lerp(theme.colorScheme.primary, theme.colorScheme.primaryContainer, 0.55)!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      padding: const EdgeInsets.fromLTRB(18,16,18,18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height:10),
-          Text(preco, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Colors.white)),
-          const SizedBox(height:12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: pagamentos.map((p)=> Container(
-              padding: const EdgeInsets.symmetric(horizontal:10, vertical:6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.15),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Text(p, style: const TextStyle(color: Colors.white, fontSize: 12,fontWeight: FontWeight.w500)),
-            )).toList(),
-          )
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
         ],
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.1)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
       ),
     );
   }
 }
+
+
 
 class _GalleryHeader extends StatefulWidget {
   final List<String> fotos; final void Function(int index) onOpen; final String titulo;
