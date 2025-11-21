@@ -32,6 +32,7 @@ class FavoritesService extends ChangeNotifier {
     final user = Supabase.instance.client.auth.currentUser;
     if(user == null) return;
     try {
+      _items.clear(); // Limpar favoritos anteriores para carregar apenas os do usuário atual
       // Busca favoritos com join simples dos campos principais do veículo
       // Ajuste conforme colunas existentes na tabela 'veiculos'
     final List data = await Supabase.instance.client
@@ -120,5 +121,11 @@ class FavoritesService extends ChangeNotifier {
       _items.clear();
       notifyListeners();
     }
+  }
+
+  void reset(){
+    _items.clear();
+    _loadedFromServer = false;
+    notifyListeners();
   }
 }

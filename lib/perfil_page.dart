@@ -8,6 +8,7 @@ import 'meus_anuncios_page.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import 'services/seller_verification_service.dart';
+import 'favorites_service.dart';
 import 'services/admin_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
@@ -177,6 +178,7 @@ class PerfilPage extends StatelessWidget {
                 title: const Text('Sair', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red)),
                 onTap: () async {
                   Navigator.of(context).pop();
+                  FavoritesService().reset(); // Limpar favoritos ao deslogar
                   await Supabase.instance.client.auth.signOut();
                   if (context.mounted) {
                     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
