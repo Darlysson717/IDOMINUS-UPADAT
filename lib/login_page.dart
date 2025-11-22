@@ -46,9 +46,18 @@ class _LoginPageState extends State<LoginPage> {
             child: const Text('Depois'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+              try {
+                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.'))
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro na atualização: $e'))
+                );
+              }
             },
             child: const Text('Atualizar'),
           ),

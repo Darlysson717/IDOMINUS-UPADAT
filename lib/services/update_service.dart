@@ -47,25 +47,30 @@ class UpdateService {
 
   static Future<void> downloadAndInstallUpdate(String apkUrl) async {
     try {
-      final dir = await getTemporaryDirectory();
+      final dir = await getExternalStorageDirectory() ?? await getTemporaryDirectory();
       final filePath = '${dir.path}/app-release.apk';
 
       print('Baixando APK de: $apkUrl para: $filePath');
 
       final response = await Dio().download(apkUrl, filePath);
       if (response.statusCode == 200) {
-        print('Download concluído. Abrindo APK...');
+        print('Download concluído. Tentando instalar APK...');
+
+        // Tentar abrir/instalar o APK
         final result = await OpenFile.open(filePath);
+        print('Resultado da abertura: ${result.type} - ${result.message}');
+
         if (result.type != ResultType.done) {
-          print('Erro ao abrir APK: ${result.message}');
-        } else {
-          print('APK aberto com sucesso.');
+          print('OpenFile falhou, tentando método alternativo...');
+          // Método alternativo: mostrar mensagem para o usuário instalar manualmente
+          throw Exception('Não foi possível instalar automaticamente. Baixe o APK manualmente de: $apkUrl');
         }
       } else {
-        print('Erro no download: ${response.statusCode}');
+        throw Exception('Erro no download: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erro ao baixar atualização: $e');
+      print('Erro ao baixar/instalar atualização: $e');
+      rethrow;
     }
   }
 }
