@@ -147,14 +147,6 @@ class PerfilPage extends StatelessWidget {
                   );
                 },
               ),
-              ListTile(
-                leading: Icon(Icons.settings, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple),
-                title: const Text('Configurações', style: TextStyle(fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pushNamed('/configuracoes');
-                },
-              ),
               Consumer<ThemeProvider>(
                 builder: (context, themeProvider, child) {
                   return ListTile(
@@ -185,7 +177,14 @@ class PerfilPage extends StatelessWidget {
                   }
                 },
               ),
+              const Divider(),
               const Spacer(),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Apagar Conta', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red)),
+                subtitle: const Text('Remove todos os seus dados permanentemente', style: TextStyle(color: Colors.red, fontSize: 12)),
+                onTap: () => _showDeleteAccountDialog(context),
+              ),
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Text(
@@ -296,6 +295,117 @@ class PerfilPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Apagar Conta', style: TextStyle(color: Colors.red)),
+          content: const Text(
+            'Esta ação é irreversível. Todos os seus dados, anúncios, favoritos e histórico serão permanentemente removidos do sistema.\n\nTem certeza de que deseja continuar?',
+            style: TextStyle(height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _deleteAccount(context);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Apagar Conta'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Removendo conta...'),
+            ],
+          ),
+        ),
+      );
+
+      // 1. Deletar anúncios do usuário
+      await Supabase.instance.client
+          .from('veiculos')
+          .delete()
+          .eq('user_id', user.id);
+
+      // 2. Deletar favoritos do usuário
+      await Supabase.instance.client
+          .from('favoritos')
+          .delete()
+          .eq('user_id', user.id);
+
+      // 3. Deletar verificações de vendedor
+      await Supabase.instance.client
+          .from('seller_verifications')
+          .delete()
+          .eq('user_id', user.id);
+
+      // 4. Deletar visualizações
+      await Supabase.instance.client
+          .from('visualizacoes')
+          .delete()
+          .eq('user_id', user.id);
+
+      // 5. Deletar contatos
+      await Supabase.instance.client
+          .from('contatos')
+          .delete()
+          .eq('user_id', user.id);
+
+      // Nota: A conta de autenticação não será deletada por segurança
+      // Apenas os dados são removidos e o usuário é deslogado
+
+      // Fechar loading dialog
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Logout e voltar para login
+      if (context.mounted) {
+        FavoritesService().reset();
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+
+    } catch (error) {
+      // Fechar loading dialog se ainda estiver aberto
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Mostrar erro
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao apagar conta: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

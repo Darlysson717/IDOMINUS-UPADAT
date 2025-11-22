@@ -15,6 +15,7 @@ import 'seller_verification_page.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:app_links/app_links.dart';
 import 'dart:async';
 
 void main() async {
@@ -33,9 +34,64 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
-      child: MyApp(),
+      child: DeepLinkHandler(child: MyApp()),
     ),
   );
+}
+
+class DeepLinkHandler extends StatefulWidget {
+  final Widget child;
+  const DeepLinkHandler({super.key, required this.child});
+
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  State<DeepLinkHandler> createState() => _DeepLinkHandlerState();
+}
+
+class _DeepLinkHandlerState extends State<DeepLinkHandler> {
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _initDeepLinks() async {
+    // Handle initial link
+    final initialUri = await _appLinks.getInitialLink();
+    if (initialUri != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleDeepLink(initialUri);
+      });
+    }
+
+    // Handle incoming links
+    _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) {
+      _handleDeepLink(uri);
+    });
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.host == 'domin.us' && uri.path.startsWith('/vehicle/')) {
+      final vehicleId = uri.pathSegments.last;
+      // Navegar para detalhes do veículo
+      DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
 }
 
 class AuthWrapper extends StatefulWidget {
@@ -109,6 +165,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'Dominus',
+          navigatorKey: DeepLinkHandler.navigatorKey,
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: themeProvider.themeMode,
@@ -118,6 +175,7 @@ class MyApp extends StatelessWidget {
             '/home': (context) => CompradorHome(),
             '/login': (context) => LoginPage(),
             '/detalhes': (context) => const DetalhesVeiculoPage(),
+            '/vehicle': (context) => const DetalhesVeiculoPage(), // Para deep links
             '/favoritos': (context) => const FavoritosPage(),
             '/meus-anuncios': (context) => const MeusAnunciosPage(),
             '/visualizacoes': (context) => const VisualizacoesPage(),

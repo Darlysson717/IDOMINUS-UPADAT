@@ -725,15 +725,24 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
         bottom: TabBar(
           controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           tabs: const [
-            Tab(text: 'Verificações', icon: Icon(Icons.verified_user)),
-            Tab(text: 'Administradores', icon: Icon(Icons.admin_panel_settings)),
+            Tab(
+              text: 'Verificações',
+              icon: Icon(Icons.verified_user, color: Colors.white),
+            ),
+            Tab(
+              text: 'Administradores',
+              icon: Icon(Icons.admin_panel_settings, color: Colors.white),
+            ),
           ],
         ),
         actions: [
           IconButton(
             onPressed: _loadData,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             tooltip: 'Atualizar',
           ),
         ],

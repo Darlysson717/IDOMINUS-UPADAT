@@ -18,7 +18,7 @@ class PublicarAnuncioPage extends StatefulWidget {
   State<PublicarAnuncioPage> createState() => _PublicarAnuncioPageState();
 }
 
-class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerProviderStateMixin {
+class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
   final _formKey = GlobalKey<FormState>();
   // Controladores básicos
   final _titulo = TextEditingController();
@@ -92,21 +92,9 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
   final List<String> _thumbUrls = [];
   bool _publicando = false;
 
-  // Animações
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-    );
-    _fadeController.forward();
 
     // Pre-fill fields if editing
     if (widget.anuncio != null) {
@@ -165,7 +153,6 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
 
   @override
   void dispose() {
-    _fadeController.dispose();
     for (final c in [
   _titulo,_descricao,_preco,_modelo,_versao,_anoFab,_km,_cidade,_cor,_airbags,_garantia
     ]) { c.dispose(); }
@@ -384,18 +371,17 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
 
   Widget _sectionTitle(String text) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 12.0),
-    child: Text(text, style: const TextStyle(fontSize:18,fontWeight: FontWeight.bold,color: Colors.deepPurple)),
+    child: Text(text, style: TextStyle(fontSize:18,fontWeight: FontWeight.bold,color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).colorScheme.primary : Colors.deepPurple)),
   );
 
   Widget _sectionCard(String title, List<Widget> children) => LayoutBuilder(
     builder: (context, constraints) {
       final isSmall = constraints.maxWidth < 600;
-      return FadeTransition(
-        opacity: _fadeAnimation,
+      return RepaintBoundary(
         child: Card(
-          elevation: 4,
+          elevation: 2,
           margin: const EdgeInsets.symmetric(vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: EdgeInsets.all(isSmall ? 12 : 16),
             child: Column(
@@ -406,7 +392,9 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
                   style: TextStyle(
                     fontSize: isSmall ? 18 : 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.deepPurple,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -424,7 +412,9 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     prefixIcon: icon != null ? Icon(icon, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple) : null,
     filled: true,
-    fillColor: Colors.grey.shade50,
+    fillColor: Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Colors.grey.shade50,
   );
 
   Widget _responsiveRow(List<Widget> children, {double spacing = 12}) {
@@ -607,6 +597,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
           return Form(
             key: _formKey,
             child: ListView(
+              physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
               children: [
             _sectionCard('Dados Básicos', [
@@ -751,9 +742,9 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
                 ),
               ),
               if(LocationService.I.lastPermission == null && !LocationService.I.deniedForever && loc.cidade == null)
-                const Padding(
-                  padding: EdgeInsets.only(top:4.0),
-                  child: Text('Precisamos só da localização enquanto você usa esta tela para sugerir cidade automaticamente.', style: TextStyle(fontSize:11,color: Colors.black54)),
+                Padding(
+                  padding: const EdgeInsets.only(top:4.0),
+                  child: Text('Precisamos só da localização enquanto você usa esta tela para sugerir cidade automaticamente.', style: TextStyle(fontSize:11,color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54)),
                 ),
               if(loc.cidade != null) Padding(
                 padding: const EdgeInsets.only(top:6.0),
@@ -778,16 +769,20 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
               const SizedBox(height:12),
               TextFormField(
                 controller: _whatsapp,
-                decoration: _dec('WhatsApp (opcional)', icon: Icons.phone),
+                decoration: _dec('WhatsApp *', icon: Icons.phone),
                 keyboardType: TextInputType.phone,
                 validator: (v){
-                  if(v != null && v.isNotEmpty){
-                    // Remove caracteres não numéricos para validação
-                    final clean = v.replaceAll(RegExp(r'[^0-9]'), '');
-                    if(clean.length < 10 || clean.length > 11) return 'WhatsApp inválido (10-11 dígitos)';
-                  }
+                  if(v == null || v.trim().isEmpty) return 'WhatsApp é obrigatório';
+                  // Remove caracteres não numéricos para validação
+                  final clean = v.replaceAll(RegExp(r'[^0-9]'), '');
+                  if(clean.length < 10 || clean.length > 11) return 'WhatsApp inválido (10-11 dígitos)';
                   return null;
                 },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'O WhatsApp é obrigatório para que compradores possam entrar em contato diretamente com você.',
+                style: TextStyle(fontSize: 12, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey, fontStyle: FontStyle.italic),
               ),
             ]),
 
@@ -818,7 +813,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
               ),
               if(_pagamentosSelecionados.isNotEmpty) Padding(
                 padding: const EdgeInsets.only(top:6.0),
-                child: Text('Selecionados: '+_pagamentosSelecionados.join(', '), style: const TextStyle(fontSize:12,color: Colors.black54)),
+                child: Text('Selecionados: '+_pagamentosSelecionados.join(', '), style: TextStyle(fontSize:12,color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54)),
               ),
               const SizedBox(height:12),
               TextFormField(controller: _garantia, decoration: _dec('Garantia', icon: Icons.shield)),
@@ -995,9 +990,13 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> with TickerPr
             ) else Container(
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.surfaceContainerHighest
+                    : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.outline
+                    : Colors.grey.shade300),
               ),
               child: Center(
                 child: Column(

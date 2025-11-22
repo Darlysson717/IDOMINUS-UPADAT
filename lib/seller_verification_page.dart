@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/cnpj_validator.dart';
 import '../services/seller_verification_service.dart';
 import '../models/seller_verification.dart';
+import '../services/admin_service.dart';
 
 class SellerVerificationPage extends StatefulWidget {
   const SellerVerificationPage({Key? key}) : super(key: key);
@@ -20,11 +21,13 @@ class _SellerVerificationPageState extends State<SellerVerificationPage> {
   String? _documentoUrl;
   bool _isLoading = false;
   SellerVerification? _currentVerification;
+  bool _isAdminOrSuperAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentVerification();
+    _loadAdminStatus();
   }
 
   Future<void> _loadCurrentVerification() async {
@@ -36,6 +39,14 @@ class _SellerVerificationPageState extends State<SellerVerificationPage> {
         _documentoUrl = verification.documentoUrl;
       });
     }
+  }
+
+  Future<void> _loadAdminStatus() async {
+    final isAdmin = await AdminService.isCurrentUserAdmin();
+    final isSuperAdmin = await AdminService.isCurrentUserSuperAdmin();
+    setState(() {
+      _isAdminOrSuperAdmin = isAdmin || isSuperAdmin;
+    });
   }
 
   @override
@@ -82,11 +93,11 @@ class _SellerVerificationPageState extends State<SellerVerificationPage> {
               // CNPJ
               TextFormField(
                 controller: _cnpjController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'CNPJ',
                   hintText: '00.000.000/0000-00',
-                  helperText: 'Para teste: use 12.345.678/0001-95 (CNPJ válido)',
-                  border: OutlineInputBorder(),
+                  helperText: _isAdminOrSuperAdmin ? 'Para teste: use 12.345.678/0001-95 (CNPJ válido)' : null,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
