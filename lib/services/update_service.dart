@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class UpdateService {
   static const String updateUrl = 'https://raw.githubusercontent.com/Darlysson717/IDOMINUS-UPADAT/main/update.json'; // Substitua pela sua URL
@@ -47,11 +48,9 @@ class UpdateService {
   }
 
   static Future<String> getCurrentVersion() async {
-    // TEMPORÁRIO: Simular versão antiga para testar atualização
-    // final packageInfo = await PackageInfo.fromPlatform();
-    // return packageInfo.version;
-    const version = '1.0.2'; // Simular versão antiga para teste
-    print('📱 Versão atual simulada: $version');
+    final packageInfo = await PackageInfo.fromPlatform();
+    final version = packageInfo.version;
+    print('📱 Versão atual: $version');
     return version;
   }
 
