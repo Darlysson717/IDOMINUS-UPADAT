@@ -19,9 +19,12 @@ import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'services/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await NotificationService.initialize();
 
   await Supabase.initialize(
     url: 'https://xwusadbehasobjzkqsgk.supabase.co',
@@ -106,6 +109,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   User? _user;
   bool _showOnboarding = false;
+  StreamSubscription? _notificationSubscription;
 
   @override
   void initState() {
@@ -121,6 +125,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _user = data.session?.user;
         _isLoading = false;
       });
+      if (_user != null) {
+        _startNotificationListener();
+      } else {
+        _stopNotificationListener();
+      }
     });
     final current = Supabase.instance.client.auth.currentUser;
     if (current != null) {
@@ -129,6 +138,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _user = current;
         _isLoading = false;
       });
+      _startNotificationListener();
     }
   }
 
@@ -205,9 +215,36 @@ class _AuthWrapperState extends State<AuthWrapper> {
     });
   }
 
+  void _startNotificationListener() {
+    _notificationSubscription?.cancel();
+    if (_user == null) return;
+    _notificationSubscription = Supabase.instance.client
+        .from('notificacoes')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', _user!.id)
+        .listen((data) {
+          for (var notification in data) {
+            if (!notification['lida']) {
+              NotificationService.showNotification(
+                title: 'Nova notificação',
+                body: notification['mensagem'],
+              );
+              // Opcionalmente marcar como lida
+              // Mas por enquanto, apenas mostrar
+            }
+          }
+        });
+  }
+
+  void _stopNotificationListener() {
+    _notificationSubscription?.cancel();
+    _notificationSubscription = null;
+  }
+
   @override
   void dispose() {
     _authSubscription.cancel();
+    _stopNotificationListener();
     super.dispose();
   }
 

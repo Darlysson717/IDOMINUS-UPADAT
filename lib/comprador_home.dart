@@ -48,6 +48,7 @@ class _CompradorHomeState extends State<CompradorHome> {
 
   @override
   void initState() {
+    print('🏠 CompradorHome initState chamado!');
     super.initState();
     _buscarVeiculos();
     _checkForUpdate();
@@ -78,12 +79,26 @@ class _CompradorHomeState extends State<CompradorHome> {
   }
 
   Future<void> _checkForUpdate() async {
+    print('🔍 Iniciando verificação de atualização...');
     final updateInfo = await UpdateService.checkForUpdate();
+    print('📡 Update info recebido: $updateInfo');
+
     if (updateInfo != null) {
       final currentVersion = await UpdateService.getCurrentVersion();
-      if (UpdateService.compareVersions(currentVersion, updateInfo['version']) < 0) {
+      print('📱 Versão atual: $currentVersion');
+      print('🆕 Versão nova: ${updateInfo['version']}');
+
+      final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+      print('⚖️ Comparação de versões: $comparison');
+
+      if (comparison < 0) {
+        print('✅ Nova versão detectada! Mostrando diálogo...');
         _showUpdateDialog(updateInfo);
+      } else {
+        print('❌ Versão já é a mais recente');
       }
+    } else {
+      print('❌ Não foi possível obter informações de atualização');
     }
   }
 

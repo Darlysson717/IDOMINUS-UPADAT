@@ -71,6 +71,21 @@ class FavoritesService extends ChangeNotifier {
             'veiculo_id': veiculoId,
           }, onConflict: 'user_id,veiculo_id');
       FavoritosRankingService.I.invalidateCache();
+
+      // Notificar o dono do veículo se não for o próprio usuário
+      if (veiculo['usuario_id'] != user.id) {
+        try {
+          await Supabase.instance.client.from('notificacoes').insert({
+            'user_id': veiculo['usuario_id'],
+            'tipo': 'favorito',
+            'mensagem': 'Seu anúncio "${veiculo['titulo']}" foi favoritado!',
+            'veiculo_id': veiculoId,
+          });
+        } catch (e) {
+          // Silenciar erro de notificação para não quebrar o favorito
+          print('Erro ao inserir notificação: $e');
+        }
+      }
     } on PostgrestException catch (error) {
       if(!wasPresent){
         _items.remove(veiculoId);

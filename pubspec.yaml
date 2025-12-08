@@ -57,8 +57,7 @@ dependencies:
   provider: ^6.1.1
   google_fonts: ^6.2.1
   shared_preferences: ^2.2.3
-
-dev_dependencies:
+  flutter_local_notifications: ^17.2.2
   flutter_test:
     sdk: flutter
 
