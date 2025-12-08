@@ -18,6 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'services/update_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -177,9 +178,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkOnboarding() async {
-    setState(() {
-      _showOnboarding = true; // Temporariamente sempre mostrar para testar
-    });
+    final prefs = await SharedPreferences.getInstance();
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = packageInfo.version;
+    final savedVersion = prefs.getString('app_version');
+
+    // Mostrar onboarding se é primeira vez ou versão mudou
+    if (savedVersion == null || savedVersion != currentVersion) {
+      setState(() {
+        _showOnboarding = true;
+      });
+      // Salvar versão atual
+      await prefs.setString('app_version', currentVersion);
+    } else {
+      setState(() {
+        _showOnboarding = false;
+      });
+    }
   }
 
   Future<void> _finishOnboarding() async {
