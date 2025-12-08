@@ -63,10 +63,13 @@ class FavoritesService extends ChangeNotifier {
     _items[veiculoId] = veiculo;
     notifyListeners();
     try {
-      await Supabase.instance.client.from('favoritos').insert({
-        'user_id': user.id,
-        'veiculo_id': veiculoId,
-      });
+      // Evitar erro de chave duplicada: usar UPSERT com conflito em (user_id, veiculo_id)
+      await Supabase.instance.client
+          .from('favoritos')
+          .upsert({
+            'user_id': user.id,
+            'veiculo_id': veiculoId,
+          }, onConflict: 'user_id,veiculo_id');
       FavoritosRankingService.I.invalidateCache();
     } on PostgrestException catch (error) {
       if(!wasPresent){
