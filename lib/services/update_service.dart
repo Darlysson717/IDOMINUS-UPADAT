@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 
@@ -9,12 +8,30 @@ class UpdateService {
 
   static Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
+      print('🌐 Fazendo requisição para: $updateUrl');
       final response = await Dio().get(updateUrl);
+      print('📊 Status da resposta: ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        return json.decode(response.data);
+        final raw = response.data;
+        Map<String, dynamic> data;
+        if (raw is String) {
+          print('🧩 Corpo recebido como String, decodificando JSON...');
+          data = json.decode(raw) as Map<String, dynamic>;
+        } else if (raw is Map<String, dynamic>) {
+          print('🧩 Corpo já é Map JSON, usando diretamente...');
+          data = raw;
+        } else {
+          print('🧩 Corpo em formato inesperado (${raw.runtimeType}), tentando toString() + decode...');
+          data = json.decode(raw.toString()) as Map<String, dynamic>;
+        }
+        print('📄 Dados recebidos: $data');
+        return data;
+      } else {
+        print('❌ Status code diferente de 200: ${response.statusCode}');
       }
     } catch (e) {
-      print('Erro ao verificar atualização: $e');
+      print('💥 Erro ao verificar atualização: $e');
     }
     return null;
   }
@@ -30,8 +47,12 @@ class UpdateService {
   }
 
   static Future<String> getCurrentVersion() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    return packageInfo.version;
+    // TEMPORÁRIO: Simular versão antiga para testar atualização
+    // final packageInfo = await PackageInfo.fromPlatform();
+    // return packageInfo.version;
+    const version = '1.0.2'; // Simular versão antiga para teste
+    print('📱 Versão atual simulada: $version');
+    return version;
   }
 
   static int compareVersions(String v1, String v2) {
