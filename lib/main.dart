@@ -17,6 +17,7 @@ import 'providers/theme_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'services/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -109,6 +110,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    // Verificar atualização logo no início (mesmo durante o onboarding)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForUpdateAtStartup();
+    });
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       debugPrint('AuthWrapper event: ${data.event}, session: ${data.session != null}');
       setState(() {
@@ -124,6 +129,51 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _checkForUpdateAtStartup() async {
+    try {
+      final updateInfo = await UpdateService.checkForUpdate();
+      if (updateInfo == null) return;
+      final currentVersion = await UpdateService.getCurrentVersion();
+      final cmp = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+      if (cmp < 0 && mounted) {
+        // Mostrar diálogo de atualização, independentemente da tela atual
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Nova versão disponível'),
+            content: Text('Versão ${updateInfo['version']} está disponível. Deseja atualizar agora?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Depois'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  try {
+                    await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erro na atualização: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Atualizar'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkOnboarding() async {
@@ -149,12 +199,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      print('⏳ AuthWrapper: Carregando...');
       return Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_showOnboarding) {
+      print('📖 AuthWrapper: Mostrando onboarding');
       return OnboardingPage(onFinish: _finishOnboarding);
     }
-    return _user == null ? LoginPage() : CompradorHome();
+    if (_user == null) {
+      print('🔐 AuthWrapper: Usuário não logado, mostrando LoginPage');
+      return LoginPage();
+    } else {
+      print('✅ AuthWrapper: Usuário logado (${_user!.id}), mostrando CompradorHome');
+      return CompradorHome();
+    }
   }
 }
 
