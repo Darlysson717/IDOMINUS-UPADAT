@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/seller_verification.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'admin_service.dart';
 
 class SellerVerificationService {
   static final SellerVerificationService _instance = SellerVerificationService._internal();
@@ -16,6 +17,22 @@ class SellerVerificationService {
       verification.toJson(),
       onConflict: 'user_id',
     );
+
+    // Notificar administradores sobre nova solicitação
+    try {
+      final admins = await AdminService.getAllAdministrators();
+      for (var admin in admins) {
+        if (admin.userId != null) {
+          await _supabase.from('notificacoes').insert({
+            'user_id': admin.userId,
+            'tipo': 'nova_solicitacao_verificacao',
+            'mensagem': 'Nova solicitação de verificação de vendedor recebida.',
+          });
+        }
+      }
+    } catch (e) {
+      print('Erro ao notificar admins: $e');
+    }
   }
 
   // Buscar verificação do usuário atual
@@ -52,6 +69,17 @@ class SellerVerificationService {
           'reviewed_at': DateTime.now().toIso8601String(),
         })
         .eq('user_id', userId);
+
+    // Notificar o vendedor sobre aprovação
+    try {
+      await _supabase.from('notificacoes').insert({
+        'user_id': userId,
+        'tipo': 'verificacao_aprovada',
+        'mensagem': 'Sua solicitação de verificação de vendedor foi aprovada!',
+      });
+    } catch (e) {
+      print('Erro ao notificar vendedor: $e');
+    }
   }
 
   // Rejeitar verificação
@@ -64,6 +92,17 @@ class SellerVerificationService {
           'reviewed_at': DateTime.now().toIso8601String(),
         })
         .eq('user_id', userId);
+
+    // Notificar o vendedor sobre rejeição
+    try {
+      await _supabase.from('notificacoes').insert({
+        'user_id': userId,
+        'tipo': 'verificacao_rejeitada',
+        'mensagem': 'Sua solicitação de verificação de vendedor foi rejeitada. Motivo: $reason',
+      });
+    } catch (e) {
+      print('Erro ao notificar vendedor: $e');
+    }
   }
 
   // Upload de documento (Alvará de Funcionamento) - MODO DESENVOLVIMENTO
