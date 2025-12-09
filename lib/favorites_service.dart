@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'services/favoritos_ranking_service.dart';
-import 'services/push_notification_service.dart';
 
 class FavoritesService extends ChangeNotifier {
   static final FavoritesService _instance = FavoritesService._internal();
@@ -76,19 +75,12 @@ class FavoritesService extends ChangeNotifier {
       // Notificar o dono do veículo se não for o próprio usuário
       if (veiculo['usuario_id'] != user.id) {
         try {
-          // Inserir notificação na tabela local (para histórico)
           final result = await Supabase.instance.client.from('notificacoes').insert({
             'user_id': veiculo['usuario_id'],
             'tipo': 'favorito',
             'mensagem': 'Seu anúncio "${veiculo['titulo']}" foi favoritado!',
             'veiculo_id': veiculoId,
           });
-
-          // Enviar notificação push (funciona mesmo offline)
-          await PushNotificationService.sendFavoriteNotification(
-            veiculo['usuario_id'],
-            veiculo['titulo'],
-          );
         } catch (e) {
           // Silenciar erro de notificação para não quebrar o favorito
         }

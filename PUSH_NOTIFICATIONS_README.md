@@ -1,74 +1,100 @@
-# Configuração de Notificações Push
+# Sistema de Notificações (Sem Firebase)
 
-Este guia explica como configurar notificações push que funcionam mesmo quando o usuário não está logado no app.
-
-## 📋 Pré-requisitos
-
-1. **Conta Firebase**: Crie um projeto no [Firebase Console](https://console.firebase.google.com/)
-2. **Configuração Android/iOS**: Adicione o Firebase ao seu app Flutter
-3. **Supabase Edge Functions**: Configure as Edge Functions no Supabase
-
-## 🚀 Passos de Configuração
-
-### 1. Firebase Setup
-
-1. Acesse [Firebase Console](https://console.firebase.google.com/)
-2. Crie um novo projeto ou selecione um existente
-3. Adicione o app Android/iOS ao projeto
-4. Baixe o `google-services.json` (Android) e `GoogleService-Info.plist` (iOS)
-5. Coloque os arquivos na pasta apropriada do Flutter
-
-### 2. Supabase Tables
-
-Execute estes SQLs no seu painel Supabase (SQL Editor):
-
-```sql
--- Tabela para tokens FCM
-\i supabase/user_fcm_tokens_table.sql
-
--- Tabela para fila de notificações push
-\i supabase/push_notifications_queue_table.sql
-```
-
-### 3. Edge Function
-
-1. No painel Supabase, vá para **Edge Functions**
-2. Crie uma nova função chamada `send-push-notifications`
-3. Use o código do arquivo `supabase/edge_function_send_push_notifications.sql`
-4. Configure as variáveis de ambiente:
-   - `FCM_SERVER_KEY`: Sua chave do servidor FCM (Firebase Console → Project Settings → Cloud Messaging)
-
-### 4. Configuração do App
-
-O app já está configurado com:
-- ✅ Firebase Core e Messaging
-- ✅ Token FCM salvo automaticamente no login
-- ✅ Notificações push enfileiradas
-- ✅ Interface local mantida
+Este sistema implementa notificações que funcionam **mesmo quando o usuário não está logado no app**, usando uma abordagem sem Firebase.
 
 ## 🔧 Como Funciona
 
-1. **Login**: Token FCM é salvo no Supabase
-2. **Ação**: Notificação é inserida na fila
-3. **Processamento**: Edge Function envia via FCM
-4. **Recebimento**: Push notification aparece no dispositivo
+### Sistema Atual:
+1. **Notificações Locais**: Aparecem quando o usuário está usando o app
+2. **Verificação em Background**: WorkManager verifica notificações pendentes a cada 15 minutos
+3. **Notificações Push-Like**: Simula push notifications através de verificação periódica
+
+### Fluxo:
+1. Alguém favorita seu anúncio → Notificação inserida no banco
+2. WorkManager verifica periodicamente → Encontra notificações não lidas
+3. Mostra notificação local → Mesmo com app fechado/minimizado
+
+## 📋 Vantagens desta Abordagem
+
+- ✅ **Sem Firebase**: Não depende de serviços externos
+- ✅ **Simples**: Usa apenas Supabase + WorkManager
+- ✅ **Privacidade**: Dados ficam no seu banco
+- ✅ **Controle Total**: Você controla quando/todas as notificações
+
+## ⚠️ Limitações
+
+- **Atraso**: Notificações chegam com até 15 minutos de atraso
+- **Bateria**: WorkManager consome bateria (mas minimamente)
+- **iOS**: Pode ter restrições em background tasks
+
+## 🚀 Configuração
+
+### 1. Dependências
+```yaml
+dependencies:
+  workmanager: ^0.5.2  # Já adicionado
+```
+
+### 2. Android Configuration
+Adicione ao `android/app/src/main/AndroidManifest.xml`:
+```xml
+<application>
+    <!-- WorkManager -->
+    <provider
+        android:name="androidx.startup.InitializationProvider"
+        android:authorities="${applicationId}.androidx-startup"
+        android:exported="false"
+        tools:node="merge">
+        <meta-data
+            android:name="androidx.work.WorkManagerInitializer"
+            android:value="androidx.startup"
+            tools:node="remove" />
+    </provider>
+</application>
+```
+
+### 3. iOS Configuration
+Adicione ao `ios/Runner/Info.plist`:
+```xml
+<dict>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>processing</string>
+    </array>
+</dict>
+```
+
+## 🔧 Personalização
+
+### Alterar Frequência de Verificação
+No `notification_service.dart`, mude:
+```dart
+frequency: const Duration(minutes: 15), // Mude para o intervalo desejado
+```
+
+### Personalizar Notificações
+Modifique `_checkPendingNotifications()` para:
+- Alterar mensagem
+- Mudar frequência
+- Adicionar condições específicas
 
 ## 🧪 Testando
 
-1. Execute o app em um dispositivo/emulador
-2. Faça login com uma conta
-3. De outra conta, favorite um anúncio
-4. A notificação deve aparecer mesmo se o app estiver fechado
+1. **Favoritar anúncio** de outra conta
+2. **Fechar o app** completamente
+3. **Esperar 15 minutos** (ou menos se alterar frequência)
+4. **Verificar**: Notificação deve aparecer na barra do sistema
 
-## 📝 Notas Importantes
+## 📊 Monitoramento
 
-- As notificações locais ainda funcionam quando o usuário está logado
-- O sistema de fila garante que nenhuma notificação seja perdida
-- Tokens FCM são automaticamente atualizados quando mudam
-- Edge Functions processam notificações em background
+As notificações são armazenadas na tabela `notificacoes` do Supabase, então você pode:
+- Ver todas as notificações enviadas
+- Acompanhar taxa de abertura
+- Analisar padrões de uso
 
-## 🔍 Troubleshooting
+## 🔄 Alternativas Futuras
 
-- **Notificações não chegam**: Verifique se o token FCM foi salvo corretamente
-- **Edge Function falha**: Verifique logs no painel Supabase
-- **FCM rejeita**: Confirme a chave do servidor e configuração do Firebase
+Se precisar de notificações instantâneas, considere:
+- **OneSignal**: Serviço de push notifications gratuito
+- **Firebase**: Se mudar de ideia sobre Firebase
+- **WebSockets**: Para notificações em tempo real quando online
