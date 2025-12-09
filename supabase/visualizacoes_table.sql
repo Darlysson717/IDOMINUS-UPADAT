@@ -14,7 +14,7 @@ BEGIN
     -- Dropar políticas que dependem da coluna
     DROP POLICY IF EXISTS visualizacoes_select_owner_anuncio ON public.visualizacoes;
     
-    -- Alterar tipo da coluna
+    -- Alterar tipo da coluna se for UUID
     IF EXISTS (SELECT 1 FROM information_schema.columns 
                WHERE table_name = 'visualizacoes' AND column_name = 'anuncio_id' AND data_type = 'uuid') THEN
         ALTER TABLE public.visualizacoes ALTER COLUMN anuncio_id TYPE TEXT;
