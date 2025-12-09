@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS public.visualizacoes (
 -- Alterar coluna anuncio_id para TEXT se necessário
 DO $$
 BEGIN
-    -- Dropar políticas que dependem da coluna
+    -- Dropar TODAS as políticas que podem depender da coluna
+    DROP POLICY IF EXISTS visualizacoes_select_owner ON public.visualizacoes;
     DROP POLICY IF EXISTS visualizacoes_select_owner_anuncio ON public.visualizacoes;
+    DROP POLICY IF EXISTS visualizacoes_insert ON public.visualizacoes;
     
     -- Alterar tipo da coluna se for UUID
     IF EXISTS (SELECT 1 FROM information_schema.columns 
@@ -20,7 +22,13 @@ BEGIN
         ALTER TABLE public.visualizacoes ALTER COLUMN anuncio_id TYPE TEXT;
     END IF;
     
-    -- Recriar política
+    -- Recriar todas as políticas
+    CREATE POLICY visualizacoes_insert ON public.visualizacoes
+    FOR INSERT WITH CHECK (true);
+
+    CREATE POLICY visualizacoes_select_owner ON public.visualizacoes
+    FOR SELECT USING (auth.uid() = viewer_id OR auth.uid() IS NULL);
+
     CREATE POLICY visualizacoes_select_owner_anuncio ON public.visualizacoes
     FOR SELECT USING (
       EXISTS (
