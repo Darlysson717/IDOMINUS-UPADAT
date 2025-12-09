@@ -218,21 +218,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void _startNotificationListener() {
     _notificationSubscription?.cancel();
     if (_user == null) return;
+    print('👂 NOTIFICATION: Iniciando listener para usuário ${_user!.id}');
     _notificationSubscription = Supabase.instance.client
         .from('notificacoes')
         .stream(primaryKey: ['id'])
         .eq('user_id', _user!.id)
         .listen((data) {
+          print('📡 NOTIFICATION: Recebidos ${data.length} registros');
           for (var notification in data) {
+            print('📨 NOTIFICATION: ${notification['tipo']} - ${notification['mensagem']}');
             if (!notification['lida']) {
               NotificationService.showNotification(
                 title: 'Nova notificação',
                 body: notification['mensagem'],
               );
-              // Opcionalmente marcar como lida
-              // Mas por enquanto, apenas mostrar
+              print('🔔 NOTIFICATION: Notificação exibida');
+            } else {
+              print('👁️ NOTIFICATION: Notificação já lida');
             }
           }
+        }, onError: (error) {
+          print('❌ NOTIFICATION: Erro no listener: $error');
         });
   }
 
