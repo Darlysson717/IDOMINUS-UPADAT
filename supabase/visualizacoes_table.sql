@@ -1,12 +1,20 @@
 -- Estrutura da tabela visualizacoes
 -- Tabela para armazenar visualizações de anúncios
 
+-- Criar tabela se não existir
 CREATE TABLE IF NOT EXISTS public.visualizacoes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     anuncio_id TEXT NOT NULL,
-    viewer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    viewer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
+
+-- Adicionar coluna criado_em se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'visualizacoes' AND column_name = 'criado_em') THEN
+        ALTER TABLE public.visualizacoes ADD COLUMN criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+END $$;
 
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_visualizacoes_anuncio_id ON public.visualizacoes(anuncio_id);
