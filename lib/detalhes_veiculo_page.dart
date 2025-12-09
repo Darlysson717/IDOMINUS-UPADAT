@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'favorites_service.dart';
 import 'services/analytics_service.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 class DetalhesVeiculoPage extends StatefulWidget {
   const DetalhesVeiculoPage({super.key});
@@ -21,20 +23,51 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     veiculo = (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?) ?? {};
-    veiculoId = (veiculo['id'] ?? veiculo['uuid'] ?? veiculo['codigo'] ?? veiculo.hashCode).toString();
+    
+    // Priorizar campos que podem ser UUID
+    String rawId = (veiculo['id'] ?? veiculo['uuid'] ?? veiculo['codigo'] ?? '').toString();
+    
+    // Se não for UUID válido, gerar um baseado no hash
+    if (!isValidUUID(rawId)) {
+      rawId = generateUUIDFromString(rawId);
+    }
+    
+    veiculoId = rawId;
     WidgetsBinding.instance.addPostFrameCallback((_) => _logVisualizacao());
   }
 
   void _logVisualizacao() {
-    if (_viewLogged) return;
-    final Map<String, dynamic> veiculo =
-        (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?) ?? {};
-    veiculoId = (veiculo['id'] ?? veiculo['uuid'] ?? veiculo['codigo'] ?? veiculo.hashCode).toString();
+    print('👁️ LOGVISUALIZACAO: Chamado para veiculoId: $veiculoId');
+    if (_viewLogged) {
+      print('🚫 LOGVISUALIZACAO: Já logado');
+      return;
+    }
     final anuncioId = veiculoId;
     if (anuncioId.isEmpty) return;
     _viewLogged = true;
+    print('📞 LOGVISUALIZACAO: Chamando AnalyticsService');
     AnalyticsService.I.logView(anuncioId: anuncioId);
   }
+
+  // Função auxiliar para validar UUID
+  bool isValidUUID(String? str) {
+    if (str == null || str.isEmpty) return false;
+    final uuidRegex = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false);
+    return uuidRegex.hasMatch(str);
+  }
+
+  // Função para gerar UUID consistente de uma string
+  String generateUUIDFromString(String input) {
+    // Usar hash da string para gerar UUID consistente
+    // Isso garante que a mesma string sempre gera o mesmo UUID
+    final bytes = utf8.encode(input);
+    final hash = sha256.convert(bytes);
+    final hashStr = hash.toString();
+    
+    // Formatar como UUID: 8-4-4-4-12
+    return '${hashStr.substring(0, 8)}-${hashStr.substring(8, 12)}-${hashStr.substring(12, 16)}-${hashStr.substring(16, 20)}-${hashStr.substring(20, 32)}';
+  }
+
   @override
   Widget build(BuildContext context) {
   final isFavorito = _fav.isFavorited(veiculoId);
