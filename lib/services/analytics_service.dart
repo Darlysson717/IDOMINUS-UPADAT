@@ -6,27 +6,34 @@ class AnalyticsService {
   static final AnalyticsService I = AnalyticsService._();
 
   final SupabaseClient _client = Supabase.instance.client;
-  final Map<String, DateTime> _viewCooldown = {};
 
   Future<void> logView({required String anuncioId}) async {
-    if (anuncioId.isEmpty) return;
-
-    final now = DateTime.now();
-    final last = _viewCooldown[anuncioId];
-    if (last != null && now.difference(last) < const Duration(minutes: 10)) {
+    print('🔍 LOGVIEW: Iniciando logView para anuncioId: $anuncioId');
+    if (anuncioId.isEmpty) {
+      print('❌ LOGVIEW: anuncioId vazio');
       return;
     }
 
-    _viewCooldown[anuncioId] = now;
+    // REMOVIDO: Cooldown que impedia múltiplas visualizações do mesmo usuário
+    // final now = DateTime.now();
+    // final last = _viewCooldown[anuncioId];
+    // if (last != null && now.difference(last) < const Duration(minutes: 10)) {
+    //     print('⏰ LOGVIEW: Cooldown ativo, pulando');
+    //     return;
+    // }
+    // _viewCooldown[anuncioId] = now;
+
+    print('📝 LOGVIEW: Tentando inserir visualização');
 
     final user = _client.auth.currentUser;
     try {
-      await _client.from('visualizacoes').insert({
+      final result = await _client.from('visualizacoes').insert({
         'anuncio_id': anuncioId,
         if (user != null) 'viewer_id': user.id,
       });
-    } catch (_) {
-      // Falha silenciosa: não pode quebrar a experiência do usuário.
+      print('✅ LOGVIEW: Inserção bem-sucedida: $result');
+    } catch (e) {
+      print('💥 LOGVIEW: Erro ao inserir: $e');
     }
   }
 
