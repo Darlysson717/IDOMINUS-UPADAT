@@ -26,12 +26,12 @@ class SellerVerificationService {
           await _supabase.from('notificacoes').insert({
             'user_id': admin.userId,
             'tipo': 'nova_solicitacao_verificacao',
-            'mensagem': 'Nova solicitação de verificação de vendedor recebida.',
+            'mensagem': 'New seller verification request received.',
           });
         }
       }
     } catch (e) {
-      print('Erro ao notificar admins: $e');
+      print('Error notifying admins: $e');
     }
   }
 
@@ -75,10 +75,10 @@ class SellerVerificationService {
       await _supabase.from('notificacoes').insert({
         'user_id': userId,
         'tipo': 'verificacao_aprovada',
-        'mensagem': 'Sua solicitação de verificação de vendedor foi aprovada!',
+        'mensagem': 'Your seller verification request has been approved!',
       });
     } catch (e) {
-      print('Erro ao notificar vendedor: $e');
+      print('Error notifying seller: $e');
     }
   }
 
@@ -98,10 +98,10 @@ class SellerVerificationService {
       await _supabase.from('notificacoes').insert({
         'user_id': userId,
         'tipo': 'verificacao_rejeitada',
-        'mensagem': 'Sua solicitação de verificação de vendedor foi rejeitada. Motivo: $reason',
+        'mensagem': 'Your seller verification request has been rejected. Reason: $reason',
       });
     } catch (e) {
-      print('Erro ao notificar vendedor: $e');
+      print('Error notifying seller: $e');
     }
   }
 
