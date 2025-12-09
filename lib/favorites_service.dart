@@ -78,7 +78,7 @@ class FavoritesService extends ChangeNotifier {
           final result = await Supabase.instance.client.from('notificacoes').insert({
             'user_id': veiculo['usuario_id'],
             'tipo': 'favorito',
-            'mensagem': 'Your ad "${veiculo['titulo']}" has been favorited!',
+            'mensagem': 'Seu anúncio "${veiculo['titulo']}" foi favoritado!',
             'veiculo_id': veiculoId,
           });
         } catch (e) {

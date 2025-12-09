@@ -93,7 +93,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: const Text('Notificações'),
         backgroundColor: Colors.deepPurple,
         actions: [
           IconButton(
@@ -112,7 +112,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       Icon(Icons.notifications_none, size: 64, color: Colors.grey),
                       const SizedBox(height: 16),
                       Text(
-                        'No notifications yet',
+                        'Nenhuma notificação ainda',
                         style: TextStyle(color: Colors.grey[600], fontSize: 18),
                       ),
                     ],
@@ -136,7 +136,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       onDismissed: (direction) {
                         _deleteNotification(notification['id']);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Notification deleted')),
+                          const SnackBar(content: Text('Notificação excluída')),
                         );
                       },
                       child: ListTile(
@@ -185,11 +185,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
       final difference = now.difference(date);
 
       if (difference.inDays == 0) {
-        return 'Today ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+        return 'Hoje ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
       } else if (difference.inDays == 1) {
-        return 'Yesterday ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+        return 'Ontem ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
       } else if (difference.inDays < 7) {
-        return '${difference.inDays} days ago';
+        return '${difference.inDays} dias atrás';
       } else {
         return '${date.day}/${date.month}/${date.year}';
       }

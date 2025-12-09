@@ -226,7 +226,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           for (var notification in data) {
             if (!notification['lida']) {
               NotificationService.showNotification(
-                title: 'New notification',
+                title: 'Nova notificação',
                 body: notification['mensagem'],
               );
             }
