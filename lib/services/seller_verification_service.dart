@@ -3,6 +3,7 @@ import '../models/seller_verification.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'admin_service.dart';
+import 'push_notification_service.dart';
 
 class SellerVerificationService {
   static final SellerVerificationService _instance = SellerVerificationService._internal();
@@ -77,6 +78,9 @@ class SellerVerificationService {
         'tipo': 'verificacao_aprovada',
         'mensagem': 'Sua solicitação de verificação de vendedor foi aprovada!',
       });
+
+      // Enviar notificação push
+      await PushNotificationService.sendVerificationApprovedNotification(userId);
     } catch (e) {
       // Error notifying seller
     }
@@ -100,6 +104,9 @@ class SellerVerificationService {
         'tipo': 'verificacao_rejeitada',
         'mensagem': 'Sua solicitação de verificação de vendedor foi rejeitada. Motivo: $reason',
       });
+
+      // Enviar notificação push
+      await PushNotificationService.sendVerificationRejectedNotification(userId, reason);
     } catch (e) {
       // Error notifying seller
     }

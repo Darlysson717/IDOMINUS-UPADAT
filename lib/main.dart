@@ -20,6 +20,14 @@ import 'dart:async';
 import 'services/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'services/notification_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Handler para mensagens FCM quando o app está fechado
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('Mensagem FCM recebida em background: ${message.notification?.title}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -127,8 +135,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       });
       if (_user != null) {
         _startNotificationListener();
+        // Salvar token FCM quando usuário faz login
+        NotificationService.saveFCMTokenToSupabase();
       } else {
         _stopNotificationListener();
+        // Remover token FCM quando usuário faz logout
+        NotificationService.removeFCMTokenFromSupabase();
       }
     });
     final current = Supabase.instance.client.auth.currentUser;
