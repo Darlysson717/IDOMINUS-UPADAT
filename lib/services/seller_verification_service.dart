@@ -31,7 +31,7 @@ class SellerVerificationService {
         }
       }
     } catch (e) {
-      print('Error notifying admins: $e');
+      // Error notifying admins
     }
   }
 
@@ -78,7 +78,7 @@ class SellerVerificationService {
         'mensagem': 'Your seller verification request has been approved!',
       });
     } catch (e) {
-      print('Error notifying seller: $e');
+      // Error notifying seller
     }
   }
 
@@ -101,7 +101,7 @@ class SellerVerificationService {
         'mensagem': 'Your seller verification request has been rejected. Reason: $reason',
       });
     } catch (e) {
-      print('Error notifying seller: $e');
+      // Error notifying seller
     }
   }
 

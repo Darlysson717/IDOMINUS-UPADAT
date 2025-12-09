@@ -74,7 +74,6 @@ class FavoritesService extends ChangeNotifier {
 
       // Notificar o dono do veículo se não for o próprio usuário
       if (veiculo['usuario_id'] != user.id) {
-        print('🔔 FAVORITE: Sending notification to owner ${veiculo['usuario_id']}');
         try {
           final result = await Supabase.instance.client.from('notificacoes').insert({
             'user_id': veiculo['usuario_id'],
@@ -82,13 +81,9 @@ class FavoritesService extends ChangeNotifier {
             'mensagem': 'Your ad "${veiculo['titulo']}" has been favorited!',
             'veiculo_id': veiculoId,
           });
-          print('✅ FAVORITE: Notification inserted: $result');
         } catch (e) {
           // Silenciar erro de notificação para não quebrar o favorito
-          print('❌ FAVORITE: Error inserting notification: $e');
         }
-      } else {
-        print('🚫 FAVORITE: User favoriting own ad, no notification');
       }
     } on PostgrestException catch (error) {
       if(!wasPresent){

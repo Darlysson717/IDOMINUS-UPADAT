@@ -12,6 +12,7 @@ import 'favorites_service.dart';
 import 'services/admin_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
+import 'notifications_page.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
 class PerfilPage extends StatelessWidget {
@@ -258,6 +259,15 @@ class PerfilPage extends StatelessWidget {
                   label: 'Visualizações',
                   color: Colors.orange,
                   onTap: () => Navigator.of(context).pushNamed('/visualizacoes'),
+                ),
+                const SizedBox(height: 14),
+                _PerfilQuickActionCard(
+                  icon: Icons.notifications,
+                  label: 'Notificações',
+                  color: Colors.blue,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                  ),
                 ),
               ],
             ),
