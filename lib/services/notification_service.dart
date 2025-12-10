@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:workmanager/workmanager.dart';
+// import 'package:workmanager/workmanager.dart'; // Removido temporariamente
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationService {
@@ -21,18 +21,8 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(settings);
 
-    // Inicializar WorkManager para verificação em background
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
-
-    // Agendar verificação periódica de notificações
-    await Workmanager().registerPeriodicTask(
-      "check-notifications",
-      "checkPendingNotifications",
-      frequency: const Duration(minutes: 15), // Verifica a cada 15 minutos
-      constraints: Constraints(
-        networkType: NetworkType.connected, // Só quando há internet
-      ),
-    );
+    // WorkManager removido temporariamente para evitar problemas
+    // await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
   }
 
   static Future<void> showNotification({
@@ -63,24 +53,7 @@ class NotificationService {
   }
 }
 
-// Callback do WorkManager para verificação em background
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    try {
-      switch (task) {
-        case "checkPendingNotifications":
-          await _checkPendingNotifications();
-          break;
-      }
-      return true;
-    } catch (e) {
-      print("Erro no WorkManager: $e");
-      return false;
-    }
-  });
-}
-
+// Função auxiliar para verificar notificações pendentes
 Future<void> _checkPendingNotifications() async {
   try {
     // Verificar se há usuário logado

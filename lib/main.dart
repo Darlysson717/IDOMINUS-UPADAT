@@ -24,8 +24,7 @@ import 'services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await NotificationService.initialize();
-
+  // Inicializar Supabase primeiro
   await Supabase.initialize(
     url: 'https://xwusadbehasobjzkqsgk.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dXNhZGJlaGFzb2Jqemtxc2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1OTAzMzgsImV4cCI6MjA3MjE2NjMzOH0.oupGPTAuMGkpdZkWZFd2wA5c5Jx22yMcdBAJaoJqJoE',
@@ -33,8 +32,15 @@ void main() async {
       authFlowType: AuthFlowType.pkce,
       autoRefreshToken: true,
     ),
-    debug: true,
+    debug: false, // Desabilitar debug para produção
   );
+
+  // Inicializar notificações (removido WorkManager problemático)
+  try {
+    await NotificationService.initialize();
+  } catch (e) {
+    print('Erro ao inicializar notificações: $e');
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -115,10 +121,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
     _checkOnboarding();
-    // Verificar atualização logo no início (mesmo durante o onboarding)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForUpdateAtStartup();
-    });
+    // _checkForUpdateAtStartup() removido temporariamente
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       debugPrint('AuthWrapper event: ${data.event}, session: ${data.session != null}');
       setState(() {
