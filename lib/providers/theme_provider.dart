@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider with ChangeNotifier {
@@ -45,7 +46,7 @@ class ThemeProvider with ChangeNotifier {
   Future<void> toggleTheme() async {
     if (_useSystemTheme) {
       // Se estava usando sistema, alterna para manual com base no sistema atual
-      final brightness = WidgetsBinding.instance.window.platformBrightness;
+      final brightness = PlatformDispatcher.instance.platformBrightness;
       _isDarkMode = brightness == Brightness.dark;
       _useSystemTheme = false;
     } else {
