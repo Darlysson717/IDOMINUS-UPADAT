@@ -144,17 +144,29 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _checkForUpdateAtStartup() async {
     try {
+      print('🔍 Iniciando verificação de atualização...');
       final updateInfo = await UpdateService.checkForUpdate();
-      if (updateInfo == null) return;
+      if (updateInfo == null) {
+        print('❌ updateInfo é null - não conseguiu buscar atualização');
+        return;
+      }
+      print('✅ updateInfo recebido: $updateInfo');
+
       final currentVersion = await UpdateService.getCurrentVersion();
+      print('📱 Versão atual do app: $currentVersion');
+      print('🌐 Versão no update.json: ${updateInfo['version']}');
+
       final cmp = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+      print('⚖️ Resultado da comparação: $cmp (negativo = atualização disponível)');
+
       if (cmp < 0 && mounted) {
+        print('🎯 Atualização disponível! Mostrando diálogo...');
         // Mostrar diálogo de atualização, independentemente da tela atual
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Nova versão disponível'),
-            content: Text('Versão ${updateInfo['version']} está disponível. Deseja atualizar agora?'),
+            content: Text('Versão ${updateInfo['version']} está disponível. Deseja atualizar agora?\n\n${updateInfo['changelog'] ?? ''}'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -164,7 +176,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 onPressed: () async {
                   Navigator.of(ctx).pop();
                   try {
-                    await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+                    await UpdateService.downloadAndInstallUpdate(updateInfo['apk_url']);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.')),
@@ -183,8 +195,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
             ],
           ),
         );
+      } else {
+        print('✅ App está atualizado ou não é possível mostrar diálogo');
       }
-    } catch (_) {}
+    } catch (e) {
+      print('💥 Erro na verificação de atualização: $e');
+    }
   }
 
   Future<void> _checkOnboarding() async {
