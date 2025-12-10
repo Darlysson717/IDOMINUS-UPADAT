@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'comprador_home.dart';
 import 'publicar_anuncio_page.dart';
@@ -386,45 +387,101 @@ class PerfilPage extends StatelessWidget {
   void _showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Nova versão disponível'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Versão ${updateInfo['version']} está disponível.'),
-            const SizedBox(height: 8),
-            if (updateInfo['changelog'] != null)
+      barrierDismissible: false, // Impede fechar tocando fora do diálogo
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false, // Impede fechar com botão voltar
+        child: AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.system_update, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Atualização Obrigatória', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'Novidades:\n${updateInfo['changelog']}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                'Uma nova versão (${updateInfo['version']}) está disponível e deve ser instalada para continuar usando o app.',
+                style: const TextStyle(height: 1.4),
               ),
+              const SizedBox(height: 12),
+              if (updateInfo['changelog'] != null) ...[
+                const Text(
+                  'Novidades:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  updateInfo['changelog'],
+                  style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'O app será fechado se você não atualizar agora.',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                // Fecha o app completamente
+                SystemNavigator.pop();
+              },
+              icon: const Icon(Icons.exit_to_app, color: Colors.grey),
+              label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                try {
+                  await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Erro ao baixar atualização: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.download),
+              label: const Text('Atualizar Agora'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Depois'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              try {
-                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erro ao baixar atualização: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Atualizar'),
-          ),
-        ],
       ),
     );
   }
