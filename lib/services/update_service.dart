@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -10,23 +11,25 @@ class UpdateService {
   static Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
       print('🌐 Fazendo requisição para: $updateUrl');
-      final response = await Dio().get(updateUrl);
+      final response = await Dio().get(
+        updateUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
       print('📊 Status da resposta: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final raw = response.data;
-        Map<String, dynamic> data;
-        if (raw is String) {
-          print('🧩 Corpo recebido como String, decodificando JSON...');
-          data = json.decode(raw) as Map<String, dynamic>;
-        } else if (raw is Map<String, dynamic>) {
-          print('🧩 Corpo já é Map JSON, usando diretamente...');
-          data = raw;
-        } else {
-          print('🧩 Corpo em formato inesperado (${raw.runtimeType}), tentando toString() + decode...');
-          data = json.decode(raw.toString()) as Map<String, dynamic>;
+        final bytes = response.data as List<int>;
+        // Remove BOM if present (EF BB BF)
+        List<int> cleanBytes = bytes;
+        if (bytes.length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
+          cleanBytes = bytes.sublist(3);
         }
-        print('📄 Dados recebidos: $data');
+        final raw = utf8.decode(cleanBytes);
+        print('📄 Raw data type: ${raw.runtimeType}');
+        print('📄 Raw data length: ${raw.length}');
+        print('📄 First 20 chars (raw): ${raw.substring(0, min(20, raw.length))}');
+        Map<String, dynamic> data = json.decode(raw) as Map<String, dynamic>;
+        print('✅ JSON decodificado com sucesso: $data');
         return data;
       } else {
         print('❌ Status code diferente de 200: ${response.statusCode}');

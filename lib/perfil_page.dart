@@ -10,6 +10,7 @@ import '../providers/theme_provider.dart';
 import 'services/seller_verification_service.dart';
 import 'favorites_service.dart';
 import 'services/admin_service.dart';
+import 'services/update_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
 import 'notifications_page.dart';
@@ -167,6 +168,12 @@ class PerfilPage extends StatelessWidget {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.system_update, color: Colors.blue),
+                title: const Text('Verificar Atualizações', style: TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: const Text('Buscar nova versão do app', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                onTap: () => _checkForUpdates(context),
+              ),
+              ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('Sair', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red)),
                 onTap: () async {
@@ -301,6 +308,121 @@ class PerfilPage extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             label: 'Perfil',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkForUpdates(BuildContext context) async {
+    print('🔍 Verificando atualizações manualmente...');
+    
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Verificando atualizações...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final updateInfo = await UpdateService.checkForUpdate();
+      
+      // Fechar loading
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (updateInfo != null) {
+        final currentVersion = await UpdateService.getCurrentVersion();
+        final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+
+        if (comparison < 0) {
+          _showUpdateDialog(context, updateInfo);
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Você já está na versão mais recente!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro ao verificar atualizações. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Fechar loading se ainda estiver aberto
+      if (context.mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nova versão disponível'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Versão ${updateInfo['version']} está disponível.'),
+            const SizedBox(height: 8),
+            if (updateInfo['changelog'] != null)
+              Text(
+                'Novidades:\n${updateInfo['changelog']}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Depois'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao baixar atualização: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Atualizar'),
           ),
         ],
       ),
