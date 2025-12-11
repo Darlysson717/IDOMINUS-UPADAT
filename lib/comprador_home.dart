@@ -56,16 +56,17 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
     print('🏠 CompradorHome initState chamado!');
     super.initState();
     
-    // Adicionar observer para detectar quando o app volta ao foreground
+    // Adicionar observer para detectar quando o app volta ao foreground     
     WidgetsBinding.instance.addObserver(this);
     
     _buscarVeiculos();
-    _checkForUpdate();
+    // Agendar verificação de updates para depois do carregamento inicial
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) _checkForUpdate();
+    });
     _loadCarouselData();
     // sincroniza favoritos do servidor (carrega uma vez)
-    FavoritesService().syncFromServer();
-    
-    // Configurar realtime para atualizações em tempo real
+    FavoritesService().syncFromServer();    // Configurar realtime para atualizações em tempo real
     _realtimeChannel = Supabase.instance.client
         .channel('veiculos_changes')
         .onPostgresChanges(
@@ -104,10 +105,15 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     
-    // Verificar atualizações quando o app volta ao foreground
+    // Verificar atualizações quando o app volta ao foreground (apenas se já passou tempo suficiente)
     if (state == AppLifecycleState.resumed) {
-      print('📱 App voltou ao foreground - verificando atualizações...');
-      _checkForUpdate();
+      final now = DateTime.now();
+      if (_lastUpdateCheck == null || now.difference(_lastUpdateCheck!).inHours >= 1) {
+        print('📱 App voltou ao foreground - verificando atualizações...');
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) _checkForUpdate();
+        });
+      }
     }
   }
 
@@ -132,9 +138,6 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
 
         if (comparison < 0) {
           print('✅ Nova versão detectada! Forçando atualização obrigatória...');
-          
-          // Aguardar um pouco para não interferir com o carregamento inicial
-          await Future.delayed(const Duration(seconds: 3));
           
           if (mounted) {
             _showForcedUpdateDialog(updateInfo);
