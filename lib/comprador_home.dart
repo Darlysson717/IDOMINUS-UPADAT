@@ -11,6 +11,9 @@ import 'services/recommendation_service.dart';
 import 'widgets/vehicle_carousel.dart';
 import 'widgets/skeleton_widgets.dart';
 import 'services/update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 
 String removeAccents(String str) {
   const accents = 'àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ';
@@ -270,13 +273,24 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
               Navigator.of(context).pop();
               try {
                 await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.'))
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ APK baixado! Instalando...'))
+                  );
+                }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erro na atualização: $e'))
-                );
+                if (e.toString().contains('INSTALL_MANUAL_REQUIRED')) {
+                  // Mostrar diálogo de instalação manual
+                  if (mounted) {
+                    _showManualInstallDialog(context, updateInfo['apkUrl']);
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('❌ Erro no download: $e'))
+                    );
+                  }
+                }
               }
             },
             child: Text('Atualizar'),
@@ -1125,6 +1139,65 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
           ),
         ),
       ],
+    );
+  }
+
+  void _showManualInstallDialog(BuildContext context, String apkUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('📥 APK Baixado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'O APK foi baixado com sucesso! Para instalar, siga estes passos:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            const Text('1. Toque em "Instalar Manualmente"'),
+            const Text('2. Permita a instalação de apps desconhecidos se solicitado'),
+            const Text('3. Siga as instruções na tela'),
+            const SizedBox(height: 12),
+            Text(
+              'Ou baixe diretamente do navegador: $apkUrl',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fechar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Tentar abrir o gerenciador de arquivos ou navegador
+              try {
+                // Tentar abrir o APK diretamente (pode funcionar em algumas versões)
+                final dir = await getApplicationDocumentsDirectory();
+                final filePath = '${dir.path}/app-release.apk';
+                final result = await OpenFile.open(filePath);
+
+                if (result.type != ResultType.done) {
+                  // Se não conseguir abrir diretamente, abrir o navegador
+                  if (await canLaunchUrl(Uri.parse(apkUrl))) {
+                    await launchUrl(Uri.parse(apkUrl));
+                  }
+                }
+              } catch (e) {
+                // Fallback: abrir no navegador
+                if (await canLaunchUrl(Uri.parse(apkUrl))) {
+                  await launchUrl(Uri.parse(apkUrl));
+                }
+              }
+            },
+            child: const Text('Instalar Manualmente'),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -70,30 +71,81 @@ class UpdateService {
 
   static Future<void> downloadAndInstallUpdate(String apkUrl) async {
     try {
-      final dir = await getExternalStorageDirectory() ?? await getTemporaryDirectory();
+      // Usar getApplicationDocumentsDirectory() ao invés de getExternalStorageDirectory()
+      final dir = await getApplicationDocumentsDirectory();
       final filePath = '${dir.path}/app-release.apk';
 
-      print('Baixando APK de: $apkUrl para: $filePath');
+      print('📥 Baixando APK de: $apkUrl');
+      print('💾 Salvando em: $filePath');
 
-      final response = await Dio().download(apkUrl, filePath);
+      final response = await Dio().download(
+        apkUrl,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final progress = (received / total * 100).toStringAsFixed(1);
+            print('📊 Progresso: $progress%');
+          }
+        },
+      );
+
       if (response.statusCode == 200) {
-        print('Download concluído. Tentando instalar APK...');
+        print('✅ Download concluído com sucesso!');
 
-        // Tentar abrir/instalar o APK
-        final result = await OpenFile.open(filePath);
-        print('Resultado da abertura: ${result.type} - ${result.message}');
+        // Verificar se o arquivo foi criado
+        final file = File(filePath);
+        final exists = await file.exists();
+        final size = await file.length();
 
-        if (result.type != ResultType.done) {
-          print('OpenFile falhou, tentando método alternativo...');
-          // Método alternativo: mostrar mensagem para o usuário instalar manualmente
-          throw Exception('Não foi possível instalar automaticamente. Baixe o APK manualmente de: $apkUrl');
+        print('📁 Arquivo existe: $exists');
+        print('📏 Tamanho: ${size} bytes');
+
+        if (exists && size > 0) {
+          print('🚀 Iniciando instalação...');
+
+          // Método 1: Tentar usar OpenFile (pode funcionar em algumas versões)
+          try {
+            final result = await OpenFile.open(filePath);
+            print('📱 OpenFile result: ${result.type} - ${result.message}');
+
+            if (result.type == ResultType.done) {
+              print('✅ APK instalado com sucesso via OpenFile');
+              return;
+            }
+          } catch (e) {
+            print('⚠️ OpenFile falhou: $e');
+          }
+
+          // Método 2: Mostrar diálogo com instruções para instalação manual
+          print('📋 Preparando instalação manual...');
+          await _showManualInstallDialog(apkUrl, filePath);
+
+        } else {
+          throw Exception('Arquivo APK não foi criado corretamente');
         }
       } else {
-        throw Exception('Erro no download: ${response.statusCode}');
+        throw Exception('Erro no download: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('Erro ao baixar/instalar atualização: $e');
+      print('❌ Erro ao baixar/instalar atualização: $e');
       rethrow;
     }
+  }
+
+  static Future<void> _showManualInstallDialog(String apkUrl, String filePath) async {
+    // Este método será chamado de um contexto com BuildContext
+    // Por enquanto, vamos apenas logar as instruções
+    print('📋 INSTRUÇÕES PARA INSTALAÇÃO MANUAL:');
+    print('1. Vá para Configurações > Apps');
+    print('2. Habilite "Instalar apps desconhecidos" para este app');
+    print('3. Abra o explorador de arquivos');
+    print('4. Navegue até: ${File(filePath).parent.path}');
+    print('5. Toque no arquivo app-release.apk');
+    print('6. Siga as instruções na tela para instalar');
+    print('');
+    print('🔗 Ou baixe diretamente de: $apkUrl');
+
+    // Lançar uma exceção específica para que a UI possa mostrar um diálogo
+    throw Exception('INSTALL_MANUAL_REQUIRED');
   }
 }
