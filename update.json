@@ -1,5 +1,6 @@
 {
-  "version": "1.0.7",
-  "apkUrl": "https://github.com/Darlysson717/IDOMINUS-UPADAT/releases/download/v1.0.7/app-release.apk",
-  "changelog": "• Correção do problema de tela branca na inicialização\n• Adição da opção 'Verificar Atualizações' no menu do perfil\n• Melhorias na estabilidade do aplicativo\n• Correções de compatibilidade com Flutter 3.x"
+  "version": "1.0.8",
+  "apkUrl": "https://github.com/Darlysson717/IDOMINUS-UPADAT/releases/download/v1.0.8/app-release.apk",
+  "changelog": "• Limitação de imagens reduzida para 5 por anúncio (otimização de armazenamento)\n• Sistema de exclusão completa de anúncios implementado (remove imagens do storage)\n• Nova aba de manutenção no painel administrativo\n• Limpeza automática de imagens órfãs\n• Correção de problemas de conectividade em release builds\n• Melhorias na estabilidade e performance\n• Otimização de uso de armazenamento do banco de dados",
+  "forceUpdate": false
 }
