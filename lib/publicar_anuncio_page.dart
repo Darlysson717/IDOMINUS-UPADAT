@@ -224,7 +224,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
     try {
       final imgs = await _picker.pickMultiImage(imageQuality: 80);
       if (imgs.isEmpty) return;
-      final restantes = 10 - _fotos.length;
+      final restantes = 5 - _fotos.length;
       if (restantes <= 0) return;
       setState(() => _fotos.addAll(imgs.take(restantes).map((e) => File(e.path))));
       // gerar thumbs
@@ -868,7 +868,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
               SwitchListTile(title: const Text('IPVA pago'), value: _ipvaPago, onChanged:(v)=>setState(()=>_ipvaPago=v)),
             ]),
 
-            _sectionTitle('Fotos (${_fotos.length}/10)'),
+            _sectionTitle('Fotos (${_fotos.length}/5)'),
             LayoutBuilder(
               builder: (context, constraints) {
                 final isVerySmall = constraints.maxWidth < 600;
@@ -877,7 +877,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       ElevatedButton.icon(
-                        onPressed: _fotos.length>=10?null:_addFotos,
+                        onPressed: _fotos.length>=5?null:_addFotos,
                         icon: const Icon(Icons.photo_library),
                         label: const Text('Galeria'),
                       ),
@@ -886,7 +886,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                         onPressed: () async {
                           try {
                             final img = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
-                            if (img!=null && _fotos.length<10) setState(()=>_fotos.add(File(img.path)));
+                            if (img!=null && _fotos.length<5) setState(()=>_fotos.add(File(img.path)));
                           } catch(e){
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Câmera: $e')));
                           }
@@ -901,7 +901,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _fotos.length>=10?null:_addFotos,
+                          onPressed: _fotos.length>=5?null:_addFotos,
                           icon: const Icon(Icons.photo_library),
                           label: const Text('Galeria'),
                         ),
@@ -912,7 +912,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                           onPressed: () async {
                             try {
                               final img = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
-                              if (img!=null && _fotos.length<10) setState(()=>_fotos.add(File(img.path)));
+                              if (img!=null && _fotos.length<5) setState(()=>_fotos.add(File(img.path)));
                             } catch(e){
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Câmera: $e')));
                             }

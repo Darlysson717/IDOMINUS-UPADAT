@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/vehicle_deletion_service.dart';
 
 class MeusAnunciosPage extends StatefulWidget {
   const MeusAnunciosPage({Key? key}) : super(key: key);
@@ -76,7 +77,7 @@ class _MeusAnunciosPageState extends State<MeusAnunciosPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar exclusão'),
-        content: const Text('Tem certeza que deseja excluir este anúncio? Esta ação não pode ser desfeita.'),
+        content: const Text('Tem certeza que deseja excluir este anúncio? Esta ação não pode ser desfeita e removerá todas as imagens associadas.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -92,13 +93,15 @@ class _MeusAnunciosPageState extends State<MeusAnunciosPage> {
 
     if (confirm == true) {
       try {
-        await Supabase.instance.client.from('veiculos').delete().eq('id', id);
+        // Usar o novo serviço de exclusão completa
+        await VehicleDeletionService.deleteVehicle(id);
+
         setState(() {
           _anuncios.removeWhere((a) => a['id'] == id);
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Anúncio excluído com sucesso')),
+            const SnackBar(content: Text('Anúncio e imagens excluídos com sucesso')),
           );
         }
       } catch (e) {

@@ -5,6 +5,8 @@ import '../services/admin_service.dart';
 import '../widgets/skeleton_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import '../services/vehicle_deletion_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminVerificationPanel extends StatefulWidget {
   const AdminVerificationPanel({super.key});
@@ -25,7 +27,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _initializeAdminStatus();
   }
 
@@ -737,6 +739,10 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
               text: 'Administradores',
               icon: Icon(Icons.admin_panel_settings, color: Colors.white),
             ),
+            Tab(
+              text: 'Manutenção',
+              icon: Icon(Icons.build, color: Colors.white),
+            ),
           ],
         ),
         actions: [
@@ -752,6 +758,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
         children: [
           _buildVerificationsTab(),
           _buildAdministratorsTab(),
+          _buildMaintenanceTab(),
         ],
       ),
     );
@@ -985,5 +992,171 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
         ],
       ),
     );
+  }
+
+  Widget _buildMaintenanceTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'Manutenção do Sistema',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Limpeza de Imagens Órfãs',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Remove imagens do storage que não estão associadas a nenhum anúncio. '
+                  'Isso ajuda a otimizar o uso de armazenamento.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _cleanupOrphanedImages,
+                    icon: const Icon(Icons.cleaning_services),
+                    label: const Text('Executar Limpeza'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Informações do Sistema',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _getSystemStats(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    }
+
+                    if (snapshot.hasError) {
+                      return Text('Erro: ${snapshot.error}');
+                    }
+
+                    final stats = snapshot.data ?? {};
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Total de anúncios: ${stats['totalVehicles'] ?? 0}'),
+                        Text('Anúncios ativos: ${stats['activeVehicles'] ?? 0}'),
+                        Text('Total de administradores: ${stats['totalAdmins'] ?? 0}'),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _cleanupOrphanedImages() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar limpeza'),
+        content: const Text(
+          'Esta ação irá remover todas as imagens órfãs do storage. '
+          'Esta operação não pode ser desfeita. Deseja continuar?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Executar', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final removedCount = await VehicleDeletionService.cleanupOrphanedImages();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$removedCount imagens órfãs removidas com sucesso'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro na limpeza: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> _getSystemStats() async {
+    try {
+      final vehiclesResponse = await Supabase.instance.client
+          .from('veiculos')
+          .select('id');
+
+      final activeVehiclesResponse = await Supabase.instance.client
+          .from('veiculos')
+          .select('id')
+          .eq('status', 'ativo');
+
+      final adminsResponse = await Supabase.instance.client
+          .from('administrators')
+          .select('id');
+
+      return {
+        'totalVehicles': vehiclesResponse.length,
+        'activeVehicles': activeVehiclesResponse.length,
+        'totalAdmins': adminsResponse.length,
+      };
+    } catch (e) {
+      print('Erro ao buscar estatísticas: $e');
+      return {};
+    }
   }
 }

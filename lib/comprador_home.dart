@@ -292,7 +292,9 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
   }
 
   Future<void> _loadRecommendedVehicles() async {
-    setState(() => _loadingRecommended = true);
+    if (mounted) {
+      setState(() => _loadingRecommended = true);
+    }
     try {
       final user = Supabase.instance.client.auth.currentUser;
       debugPrint('Carregando recomendações para usuário: ${user?.id ?? 'não logado'}');
@@ -300,18 +302,24 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
       final recommendations = await _recommendationService.getPersonalizedRecommendations(limit: 20);
       debugPrint('Recomendações recebidas: ${recommendations.length}');
 
-      setState(() {
-        _recommendedVehicles = recommendations;
-        _loadingRecommended = false;
-      });
+      if (mounted) {
+        setState(() {
+          _recommendedVehicles = recommendations;
+          _loadingRecommended = false;
+        });
+      }
     } catch (e) {
-      setState(() => _loadingRecommended = false);
+      if (mounted) {
+        setState(() => _loadingRecommended = false);
+      }
       debugPrint('Erro ao carregar recomendações: $e');
     }
   }
 
   Future<void> _buscarVeiculos({bool aplicarStatus = true}) async {
-    setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
     try {
       // Build server-side filters based on _filtrosAvancados to reduce payload
       var query = Supabase.instance.client.from('veiculos').select();
@@ -405,10 +413,12 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
       } catch (_) {
         veiculos = [];
       }
-      setState(() {
-        _veiculos = veiculos;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _veiculos = veiculos;
+          _loading = false;
+        });
+      }
     } on PostgrestException catch (error) {
       if (aplicarStatus && error.code == '42703') {
         if (mounted) {
@@ -420,17 +430,21 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
         await _buscarVeiculos(aplicarStatus: false);
         return;
       }
-      setState(() {
-        _veiculos = [];
-        _loading = false;
-        _erroSnack = 'Erro ao carregar veículos: ${error.message}';
-      });
+      if (mounted) {
+        setState(() {
+          _veiculos = [];
+          _loading = false;
+          _erroSnack = 'Erro ao carregar veículos: ${error.message}';
+        });
+      }
     } catch (e) {
-      setState(() {
-        _veiculos = [];
-        _loading = false;
-        _erroSnack = 'Erro ao carregar veículos: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _veiculos = [];
+          _loading = false;
+          _erroSnack = 'Erro ao carregar veículos: $e';
+        });
+      }
     }
   }
 
@@ -987,12 +1001,12 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         onTap: (index) {
           if (index == 0) {
-            setState(() => _selectedIndex = 0);
+            if (mounted) setState(() => _selectedIndex = 0);
           } else if (index == 1) {
-            setState(() => _selectedIndex = 1);
+            if (mounted) setState(() => _selectedIndex = 1);
             Navigator.pushNamed(context, '/favoritos');
           } else if (index == 2) {
-            setState(() => _selectedIndex = 2);
+            if (mounted) setState(() => _selectedIndex = 2);
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const PerfilPage()),
             );
