@@ -365,7 +365,7 @@ class PerfilPage extends StatelessWidget {
   ),
   // BottomNavigationBar fixo para navegação
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2,
+        currentIndex: 3,
         onTap: (index) {
           if (index == 0) {
             Navigator.of(context).pushAndRemoveUntil(
@@ -374,6 +374,8 @@ class PerfilPage extends StatelessWidget {
             );
           } else if (index == 1) {
             Navigator.of(context).pushNamed('/favoritos');
+          } else if (index == 2) {
+            Navigator.of(context).pushNamed('/lojistas');
           }
         },
         selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
@@ -386,6 +388,10 @@ class PerfilPage extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite_border),
             label: 'Favoritos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store),
+            label: 'Lojistas',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
