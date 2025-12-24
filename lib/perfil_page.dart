@@ -358,6 +358,12 @@ class PerfilPage extends StatelessWidget {
                   color: Colors.orange,
                   onTap: () => Navigator.of(context).pushNamed('/visualizacoes'),
                 ),
+                _PerfilQuickActionCard(
+                  icon: Icons.business,
+                  label: 'Sobre o Dominus',
+                  color: Colors.blue,
+                  onTap: () => Navigator.of(context).pushNamed('/sobre-dominus'),
+                ),
               ],
             ),
           ],

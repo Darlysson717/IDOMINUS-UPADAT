@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'favorites_service.dart';
+import 'comprador_home.dart';
 
 class FavoritosPage extends StatefulWidget {
   const FavoritosPage({super.key});
@@ -127,6 +128,42 @@ class _FavoritosPageState extends State<FavoritosPage> {
               separatorBuilder: (_, __)=> const SizedBox(height: 12),
               itemCount: items.length,
             ),
+  // BottomNavigationBar fixo para navegação
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1,
+        onTap: (index) {
+          if (index == 0) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const CompradorHome()),
+              (route) => false,
+            );
+          } else if (index == 2) {
+            Navigator.of(context).pushNamed('/lojistas');
+          } else if (index == 3) {
+            Navigator.of(context).pushNamed('/perfil');
+          }
+        },
+        selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
+        unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_border),
+            label: 'Favoritos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store),
+            label: 'Lojistas',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Perfil',
+          ),
+        ],
+      ),
     );
   }
 

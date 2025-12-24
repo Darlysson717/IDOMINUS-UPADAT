@@ -14,6 +14,7 @@ import 'perfil_page.dart';
 import 'seller_verification_page.dart';
 import 'notifications_page.dart';
 import 'lojistas_seguidos_page.dart';
+import 'sobre_dominus_page.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -257,6 +258,7 @@ class MyApp extends StatelessWidget {
             '/seller-verification': (context) => const SellerVerificationPage(),
             '/notifications': (context) => const NotificationsPage(),
             '/lojistas': (context) => const LojistasSeguidosPage(),
+            '/sobre-dominus': (context) => const SobreDominusPage(),
           },
         );
       },
