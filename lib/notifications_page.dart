@@ -74,6 +74,60 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  Future<void> _deleteAllNotifications() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('notificacoes')
+          .delete()
+          .eq('user_id', user.id);
+
+      setState(() {
+        _notifications.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Todas as notificações foram excluídas')),
+        );
+      }
+    } catch (e) {
+      print('Error deleting all notifications: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao excluir notificações')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDeleteAllDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir todas as notificações'),
+        content: const Text('Tem certeza que deseja excluir todas as notificações? Esta ação não pode ser desfeita.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Excluir todas'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAllNotifications();
+    }
+  }
+
   String _getNotificationIcon(String tipo) {
     switch (tipo) {
       case 'favorito':
@@ -96,8 +150,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
         title: const Text('Notificações'),
         backgroundColor: Colors.deepPurple,
         actions: [
+          if (_notifications.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Excluir todas as notificações',
+              onPressed: _showDeleteAllDialog,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Atualizar',
             onPressed: _loadNotifications,
           ),
         ],

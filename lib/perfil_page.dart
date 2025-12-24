@@ -1,7 +1,6 @@
 
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'comprador_home.dart';
 import 'publicar_anuncio_page.dart';
@@ -14,7 +13,7 @@ import 'services/admin_service.dart';
 import 'services/update_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
-import 'notifications_page.dart';
+import 'services/analytics_service.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
 class PerfilPage extends StatelessWidget {
@@ -27,6 +26,7 @@ class PerfilPage extends StatelessWidget {
     final email = user?.email ?? '';
     final fotoUrl = user?.userMetadata?['avatar_url'] ?? '';
     final isSmall = MediaQuery.of(context).size.width < 400;
+    final userId = user?.id;
 
     return Scaffold(
       appBar: AppBar(
@@ -112,12 +112,12 @@ class PerfilPage extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     subtitle: isPending
-                        ? const Text('Análise em andamento', style: TextStyle(color: Colors.orange, fontSize: 12))
-                        : isRejected
-                        ? const Text('Verificação rejeitada', style: TextStyle(color: Colors.red, fontSize: 12))
-                        : isApproved
-                        ? const Text('Verificado ✓', style: TextStyle(color: Colors.green, fontSize: 12))
-                        : const Text('Necessário para vender', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ? const Text('Análise em andamento', style: TextStyle(color: Colors.orange, fontSize: 12))
+                      : isRejected
+                      ? const Text('Verificação rejeitada', style: TextStyle(color: Colors.red, fontSize: 12))
+                      : isApproved
+                      ? const Text('Verificado ✓', style: TextStyle(color: Colors.green, fontSize: 12))
+                      : const Text('Necessário para vender', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     onTap: () {
                       Navigator.of(context).pop();
                       Navigator.of(context).pushNamed('/seller-verification');
@@ -212,35 +212,127 @@ class PerfilPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 10,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
               child: Container(
-                width: 400,
-                padding: EdgeInsets.symmetric(vertical: isSmall ? 32 : 48, horizontal: isSmall ? 18 : 36),
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: isSmall ? 46 : 56, horizontal: isSmall ? 16 : 22),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: LinearGradient(
+                    colors: Theme.of(context).brightness == Brightness.dark
+                        ? [Colors.deepPurple.shade900, Colors.deepPurple.shade600]
+                        : [Colors.deepPurple.shade700, Colors.deepPurple.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.person_outline, size: isSmall ? 48 : 64, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Bem-vindo ao seu perfil!',
-                      style: TextStyle(fontSize: isSmall ? 19 : 24, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: isSmall ? 40 : 48,
+                          backgroundImage: fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
+                          child: fotoUrl.isEmpty ? const Icon(Icons.person, size: 36, color: Colors.white70) : null,
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                nome,
+                                style: TextStyle(
+                                  fontSize: isSmall ? 20 : 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                email.isNotEmpty ? email : 'Conta sem e-mail',
+                                style: TextStyle(
+                                  fontSize: isSmall ? 14 : 15,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Acesse o menu lateral para configurações e sair.',
-                      style: TextStyle(fontSize: isSmall ? 14 : 16, color: Colors.grey[700]),
-                      textAlign: TextAlign.center,
-                    ),
+                    if (userId != null)
+                      FutureBuilder<Map<String, int>>(
+                        future: _loadUserStats(userId),
+                        builder: (context, snapshot) {
+                          final stats = snapshot.data ?? const {'anuncios': 0, 'visualizacoes': 0, 'seguidores': 0};
+                          final loading = snapshot.connectionState == ConnectionState.waiting;
+
+                          Widget buildStat(String label, int value) {
+                            final textColor = Colors.white;
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  loading ? '—' : value.toString(),
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: isSmall ? 16 : 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: textColor.withValues(alpha: 0.8),
+                                    fontSize: isSmall ? 12 : 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: isSmall ? 72 : 88,
+                                  child: buildStat('Anúncios', stats['anuncios'] ?? 0),
+                                ),
+                                const SizedBox(width: 14),
+                                buildStat('Visualizações', stats['visualizacoes'] ?? 0),
+                                const SizedBox(width: 14),
+                                buildStat('Seguidores', stats['seguidores'] ?? 0),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 24),
-            // Cards de ações rápidas
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            // Cards de ações rápidas em grid 2x2 (quadrados)
+            GridView.count(
+              crossAxisCount: 2,
+              // Maior razão reduz a altura e deixa os cards mais compactos
+              childAspectRatio: 1.25,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _PerfilQuickActionCard(
                   icon: Icons.directions_car,
@@ -250,7 +342,6 @@ class PerfilPage extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const MeusAnunciosPage()),
                   ),
                 ),
-                const SizedBox(height: 14),
                 _PerfilQuickActionCard(
                   icon: Icons.add_box,
                   label: 'Publicar',
@@ -261,21 +352,11 @@ class PerfilPage extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 14),
                 _PerfilQuickActionCard(
                   icon: Icons.bar_chart,
                   label: 'Visualizações',
                   color: Colors.orange,
                   onTap: () => Navigator.of(context).pushNamed('/visualizacoes'),
-                ),
-                const SizedBox(height: 14),
-                _PerfilQuickActionCard(
-                  icon: Icons.notifications,
-                  label: 'Notificações',
-                  color: Colors.blue,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
-                  ),
                 ),
               ],
             ),
@@ -387,101 +468,45 @@ class PerfilPage extends StatelessWidget {
   void _showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Impede fechar tocando fora do diálogo
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false, // Impede fechar com botão voltar
-        child: AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.system_update, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Atualização Obrigatória', style: TextStyle(color: Colors.red)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      builder: (context) => AlertDialog(
+        title: const Text('Nova versão disponível'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Versão ${updateInfo['version']} está disponível.'),
+            const SizedBox(height: 8),
+            if (updateInfo['changelog'] != null)
               Text(
-                'Uma nova versão (${updateInfo['version']}) está disponível e deve ser instalada para continuar usando o app.',
-                style: const TextStyle(height: 1.4),
+                'Novidades:\n${updateInfo['changelog']}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
-              const SizedBox(height: 12),
-              if (updateInfo['changelog'] != null) ...[
-                const Text(
-                  'Novidades:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  updateInfo['changelog'],
-                  style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'O app será fechado se você não atualizar agora.',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton.icon(
-              onPressed: () {
-                // Fecha o app completamente
-                SystemNavigator.pop();
-              },
-              icon: const Icon(Icons.exit_to_app, color: Colors.grey),
-              label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                try {
-                  await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Erro ao baixar atualização: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.download),
-              label: const Text('Atualizar Agora'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-            ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Depois'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao baixar atualização: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Atualizar'),
+          ),
+        ],
       ),
     );
   }
@@ -598,6 +623,41 @@ class PerfilPage extends StatelessWidget {
   }
 }
 
+Future<Map<String, int>> _loadUserStats(String userId) async {
+  final client = Supabase.instance.client;
+
+  try {
+    // Mesmo cálculo da tela de Visualizações (AnalyticsService) para total de visualizações
+    final summary = await AnalyticsService.I.fetchSummary(days: 90);
+
+    // Mesma contagem usada em MeusAnunciosPage: lista anúncios do usuário
+    final anunciosResponse = await client
+        .from('veiculos')
+        .select()
+        .eq('usuario_id', userId);
+
+    int anunciosCount = 0;
+    try {
+      anunciosCount = (anunciosResponse as List).length;
+    } catch (_) {
+      anunciosCount = 0;
+    }
+
+    final seguidoresResponse = await client
+        .from('vendedores_seguidos')
+        .select('id')
+        .eq('vendedor_id', userId);
+
+    return {
+      'anuncios': anunciosCount,
+      'visualizacoes': summary.totalViews,
+      'seguidores': (seguidoresResponse as List).length,
+    };
+  } catch (_) {
+    return const {'anuncios': 0, 'visualizacoes': 0, 'seguidores': 0};
+  }
+}
+
 /// Card de ação rápida para o perfil
 class _PerfilQuickActionCard extends StatelessWidget {
   final IconData icon;
@@ -625,16 +685,17 @@ class _PerfilQuickActionCard extends StatelessWidget {
           elevation: 3,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
-            padding: EdgeInsets.symmetric(vertical: isSmall ? 16 : 22),
+            padding: EdgeInsets.symmetric(vertical: isSmall ? 12 : 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: color, size: isSmall ? 28 : 34),
+                Icon(icon, color: color, size: isSmall ? 24 : 28),
                 const SizedBox(height: 8),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: isSmall ? 13 : 15,
+                    fontSize: isSmall ? 13 : 14,
                     fontWeight: FontWeight.w600,
                     color: color,
                   ),

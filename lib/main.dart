@@ -12,14 +12,15 @@ import 'visualizacoes_page.dart';
 import 'top_favoritos_page.dart';
 import 'perfil_page.dart';
 import 'seller_verification_page.dart';
+import 'notifications_page.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
-import 'services/update_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'services/notification_service.dart';
+import 'services/presence_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,9 @@ void main() async {
     ),
     debug: false, // Desabilitar debug para produção
   );
+
+  // Inicializar PresenceService para contar usuários online
+  await PresenceService().start();
 
   // Inicializar notificações (removido WorkManager problemático)
   try {
@@ -145,67 +149,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 
-  Future<void> _checkForUpdateAtStartup() async {
-    try {
-      print('🔍 Iniciando verificação de atualização...');
-      final updateInfo = await UpdateService.checkForUpdate();
-      if (updateInfo == null) {
-        print('❌ updateInfo é null - não conseguiu buscar atualização');
-        return;
-      }
-      print('✅ updateInfo recebido: $updateInfo');
-
-      final currentVersion = await UpdateService.getCurrentVersion();
-      print('📱 Versão atual do app: $currentVersion');
-      print('🌐 Versão no update.json: ${updateInfo['version']}');
-
-      final cmp = UpdateService.compareVersions(currentVersion, updateInfo['version']);
-      print('⚖️ Resultado da comparação: $cmp (negativo = atualização disponível)');
-
-      if (cmp < 0 && mounted) {
-        print('🎯 Atualização disponível! Mostrando diálogo...');
-        // Mostrar diálogo de atualização, independentemente da tela atual
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Nova versão disponível'),
-            content: Text('Versão ${updateInfo['version']} está disponível. Deseja atualizar agora?\n\n${updateInfo['changelog'] ?? ''}'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Depois'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(ctx).pop();
-                  try {
-                    await UpdateService.downloadAndInstallUpdate(updateInfo['apk_url']);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.')),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Erro na atualização: $e')),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Atualizar'),
-              ),
-            ],
-          ),
-        );
-      } else {
-        print('✅ App está atualizado ou não é possível mostrar diálogo');
-      }
-    } catch (e) {
-      print('💥 Erro na verificação de atualização: $e');
-    }
-  }
-
   Future<void> _checkOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     final packageInfo = await PackageInfo.fromPlatform();
@@ -294,7 +237,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'Dominus',
-          navigatorKey: DeepLinkHandler.navigatorKey,
+          navigatorKey: navigatorKey,
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: themeProvider.themeMode,
@@ -311,6 +254,7 @@ class MyApp extends StatelessWidget {
             '/mais-favoritos': (context) => const TopFavoritosPage(),
             '/perfil': (context) => const PerfilPage(),
             '/seller-verification': (context) => const SellerVerificationPage(),
+            '/notifications': (context) => const NotificationsPage(),
           },
         );
       },
@@ -496,3 +440,4 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 // ...existing code...
+
