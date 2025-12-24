@@ -32,14 +32,6 @@ class _FiltroAvancadoState extends State<FiltroAvancado> {
 		int? _numPortas;
 		String? _condicao;
 
-		String? _carroceria;
-
-		String? _direcao;
-
-		String? _farois;
-
-		String? _situacaoVeiculo;
-
 		final List<String> _marcas = const [
 
     'Chevrolet','Volkswagen','Fiat','Toyota','Hyundai','Jeep','Renault','Honda','Nissan','Caoa Chery',
@@ -71,18 +63,6 @@ class _FiltroAvancadoState extends State<FiltroAvancado> {
 		final List<String> _cores = ['Preto', 'Branco', 'Prata', 'Cinza', 'Vermelho', 'Azul', 'Verde', 'Amarelo', 'Outro'];
 		final List<int> _portas = [2, 3, 4, 5];
 		final List<String> _condicoes = ['Novo', 'Usado', 'Seminovo'];
-
-		final List<String> _carrocerias = const [
-
-    'Hatch','Sedan','SUV','Picape','Perua','Cupê','Conversível','Minivan','Utilitário','Outro'
-
-  ];
-
-		final List<String> _direcoes = const ['Elétrica', 'Hidráulica', 'Mecânica'];
-
-		final List<String> _faroisOpcoes = const ['LED', 'Halógeno', 'Xenon'];
-
-		final List<String> _situacoesVeiculo = const ['Em dia', 'Financiado', 'Multado', 'Outro'];
 
 
 		void _aplicar() {

@@ -75,7 +75,7 @@ class FavoritesService extends ChangeNotifier {
       // Notificar o dono do veículo se não for o próprio usuário
       if (veiculo['usuario_id'] != user.id) {
         try {
-          final result = await Supabase.instance.client.from('notificacoes').insert({
+          await Supabase.instance.client.from('notificacoes').insert({
             'user_id': veiculo['usuario_id'],
             'tipo': 'favorito',
             'mensagem': 'Seu anúncio "${veiculo['titulo']}" foi favoritado!',

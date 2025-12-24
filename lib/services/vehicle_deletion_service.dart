@@ -17,7 +17,7 @@ class VehicleDeletionService {
         throw Exception('Veículo não encontrado');
       }
 
-      final vehicleData = vehicleResponse as Map<String, dynamic>;
+      final vehicleData = vehicleResponse;
       final fotos = vehicleData['fotos'] as List<dynamic>? ?? [];
       final fotosThumb = vehicleData['fotos_thumb'] as List<dynamic>? ?? [];
 

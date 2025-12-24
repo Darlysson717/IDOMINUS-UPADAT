@@ -87,7 +87,6 @@ class _VisualizacoesPageState extends State<VisualizacoesPage> {
 
     final csvString = const ListToCsvConverter().convert(csvData);
     final fileName = 'analytics_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv';
-
     try {
       final bytes = Uint8List.fromList(csvString.codeUnits);
       await Share.shareXFiles([
@@ -108,10 +107,10 @@ class _VisualizacoesPageState extends State<VisualizacoesPage> {
 
   List<String> _getAlerts(AnalyticsSummary summary) {
     final alerts = <String>[];
-    if (summary.overallConversionRate < 0.01) { // Menos de 1%
+    if (summary.overallConversionRate < 0.01) {
       alerts.add('Taxa de conversão baixa (${(summary.overallConversionRate * 100).toStringAsFixed(1)}%). Considere melhorar as descrições dos anúncios.');
     }
-    if (summary.totalViews > 1000 && summary.overallConversionRate < 0.05) { // Muitas views, baixa conversão
+    if (summary.totalViews > 1000 && summary.overallConversionRate < 0.05) {
       alerts.add('Muitas visualizações mas baixa conversão. Verifique se os preços estão competitivos.');
     }
     if (summary.totalContacts == 0 && summary.totalViews > 10) {
@@ -250,16 +249,15 @@ class _VisualizacoesPageState extends State<VisualizacoesPage> {
                   },
                 ),
                 const SizedBox(height: 24),
-                ..._getAlerts(summary).map((alert) => _AlertCard(message: alert)).toList(),
+                ..._getAlerts(summary).map((alert) => _AlertCard(message: alert)),
                 if (_getAlerts(summary).isNotEmpty) const SizedBox(height: 16),
-                _TimelineCard(summary: summary),
-                const SizedBox(height: 28),
+                const SizedBox(height: 16),
                 Text(
                   'Desempenho por anúncio',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
-                ...summary.perAdStats.map((stat) => _AnuncioStatTile(stat: stat)).toList(),
+                ...summary.perAdStats.map((stat) => _AnuncioStatTile(stat: stat)),
                 if (_loading) ...[
                   const SizedBox(height: 20),
                   const Center(child: CircularProgressIndicator()),
@@ -299,7 +297,7 @@ class _KpiCard extends StatelessWidget {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(10),
@@ -317,133 +315,6 @@ class _KpiCard extends StatelessWidget {
             Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TimelineCard extends StatelessWidget {
-  final AnalyticsSummary summary;
-
-  const _TimelineCard({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (summary.timeline.isEmpty) {
-      return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
-            child: Text(
-              'Ainda não há visualizações registradas no período selecionado.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final maxCount = summary.timeline.map((e) => e.count).reduce((a, b) => a > b ? a : b).toDouble();
-    final formatter = DateFormat('dd/MM');
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Evolução diária',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 190,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: summary.timeline.map((item) {
-                          final double heightFactor = maxCount == 0 ? 0 : (item.count / maxCount).clamp(0.0, 1.0);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            child: SizedBox(
-                              width: 50,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 300),
-                                    height: 130.0 * heightFactor,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      gradient: LinearGradient(
-                                        begin: Alignment.bottomCenter,
-                                        end: Alignment.topCenter,
-                                        colors: [
-                                          theme.colorScheme.primary,
-                                          theme.colorScheme.primary.withOpacity(0.45),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    item.count.toString(),
-                                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    formatter.format(item.date),
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                          fontSize: 11,
-                                        ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 1,
-                    width: double.infinity,
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-                  ),
-                  if (summary.timeline.length > 7)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          Icon(Icons.swipe_right_alt, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Arraste para ver mais dias',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
             ),
           ],
         ),
@@ -523,7 +394,7 @@ class _InfoPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: effectiveColor.withOpacity(0.12),
+        color: effectiveColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

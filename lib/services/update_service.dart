@@ -69,7 +69,12 @@ class UpdateService {
     return parts1.length.compareTo(parts2.length);
   }
 
-  static Future<void> downloadAndInstallUpdate(String apkUrl) async {
+  static Future<void> downloadAndInstallUpdate(
+    String apkUrl, {
+    Function(double)? onProgress,
+    Function(String)? onStatus,
+    Function()? onDownloadComplete,
+  }) async {
     try {
       // Usar getApplicationDocumentsDirectory() ao invés de getExternalStorageDirectory()
       final dir = await getApplicationDocumentsDirectory();
@@ -78,19 +83,23 @@ class UpdateService {
       print('📥 Baixando APK de: $apkUrl');
       print('💾 Salvando em: $filePath');
 
+      onStatus?.call('Baixando atualização...');
+
       final response = await Dio().download(
         apkUrl,
         filePath,
         onReceiveProgress: (received, total) {
           if (total != -1) {
-            final progress = (received / total * 100).toStringAsFixed(1);
-            print('📊 Progresso: $progress%');
+            final progress = (received / total * 100);
+            print('📊 Progresso: ${progress.toStringAsFixed(1)}%');
+            onProgress?.call(progress);
           }
         },
       );
 
       if (response.statusCode == 200) {
         print('✅ Download concluído com sucesso!');
+        onDownloadComplete?.call();
 
         // Verificar se o arquivo foi criado
         final file = File(filePath);

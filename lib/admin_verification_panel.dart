@@ -231,13 +231,6 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
     return 'image/jpeg'; // Default
   }
 
-  void _testImageDialog() {
-    // Imagem base64 pequena para teste (1x1 pixel PNG transparente)
-    const testBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-    print('=== TESTE: Usando imagem hardcoded ===');
-    _showImageDialog(testBase64);
-  }
-
   Future<void> _requestRevalidation(String userId) async {
     final confirmed = await showDialog<bool>(
       context: context,
