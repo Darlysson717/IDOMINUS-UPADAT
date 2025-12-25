@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'favorites_service.dart';
 import 'services/analytics_service.dart';
+import 'services/profile_service.dart';
+import 'services/follow_service.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
@@ -18,6 +21,9 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
   bool _viewLogged = false;
   late final String veiculoId;
   Map<String, dynamic> veiculo = {};
+  bool _isFollowing = false;
+  bool _loadingFollow = false;
+  Map<String, dynamic>? _sellerProfile;
 
   @override
   void didChangeDependencies() {
@@ -34,18 +40,17 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
     
     veiculoId = rawId;
     WidgetsBinding.instance.addPostFrameCallback((_) => _logVisualizacao());
+    _checkIfFollowing();
+    _loadSellerProfile();
   }
 
   void _logVisualizacao() {
-    print('👁️ LOGVISUALIZACAO: Chamado para veiculoId: $veiculoId');
     if (_viewLogged) {
-      print('🚫 LOGVISUALIZACAO: Já logado');
       return;
     }
     final anuncioId = veiculoId;
     if (anuncioId.isEmpty) return;
     _viewLogged = true;
-    print('📞 LOGVISUALIZACAO: Chamando AnalyticsService');
     AnalyticsService.I.logView(anuncioId: anuncioId);
   }
 
@@ -66,6 +71,69 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
     
     // Formatar como UUID: 8-4-4-4-12
     return '${hashStr.substring(0, 8)}-${hashStr.substring(8, 12)}-${hashStr.substring(12, 16)}-${hashStr.substring(16, 20)}-${hashStr.substring(20, 32)}';
+  }
+
+  Future<void> _toggleFollow() async {
+    final sellerUserId = veiculo['user_id'];
+    if (sellerUserId == null) return;
+
+    if (mounted) {
+      setState(() => _loadingFollow = true);
+    }
+
+    try {
+      if (_isFollowing) {
+        await FollowService.I.unfollowSeller(sellerUserId);
+      } else {
+        await FollowService.I.followSeller(sellerUserId);
+      }
+
+      if (mounted) {
+        setState(() => _isFollowing = !_isFollowing);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao ${_isFollowing ? 'deixar de seguir' : 'seguir'} vendedor: $e'))
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingFollow = false);
+      }
+    }
+  }
+
+  Future<void> _loadSellerProfile() async {
+    final sellerUserId = veiculo['user_id'];
+    if (sellerUserId == null) {
+      return;
+    }
+
+    try {
+      final profile = await ProfileService().getProfile(sellerUserId);
+      if (mounted) {
+        setState(() {
+          _sellerProfile = profile;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar perfil do vendedor: $e');
+    }
+  }
+
+  void _checkIfFollowing() async {
+    final sellerUserId = veiculo['user_id'];
+    if (sellerUserId == null) return;
+
+    try {
+      final following = await FollowService.I.isFollowing(sellerUserId);
+      if (mounted) {
+        setState(() => _isFollowing = following);
+      }
+    } catch (e) {
+      print('Erro ao verificar se segue: $e');
+    }
   }
 
   @override
@@ -151,6 +219,15 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
     }
 
     final theme = Theme.of(context);
+
+    // Extrair dados do vendedor do perfil
+    String sellerName = 'Vendedor';
+    String sellerAvatar = '';
+    if (_sellerProfile != null) {
+      sellerName = _sellerProfile!['name'] ?? 'Vendedor';
+      sellerAvatar = _sellerProfile!['avatar_url'] ?? '';
+    }
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -253,6 +330,14 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
                             );
                           }
                         },
+                      ),
+                      const SizedBox(height: 20),
+                      _SellerCard(
+                        name: sellerName,
+                        avatarUrl: sellerAvatar,
+                        isFollowing: _isFollowing,
+                        loading: _loadingFollow,
+                        onToggleFollow: _toggleFollow,
                       ),
                       const SizedBox(height: 20),
                       if (veiculo['descricao'] != null && (veiculo['descricao'] as String).trim().isNotEmpty)
@@ -725,6 +810,61 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SellerCard extends StatelessWidget {
+  final String name;
+  final String avatarUrl;
+  final bool isFollowing;
+  final bool loading;
+  final VoidCallback onToggleFollow;
+
+  const _SellerCard({
+    required this.name,
+    required this.avatarUrl,
+    required this.isFollowing,
+    required this.loading,
+    required this.onToggleFollow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Vendedor',
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            child: avatarUrl.isEmpty ? const Icon(Icons.person) : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: loading ? null : onToggleFollow,
+            icon: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(isFollowing ? Icons.person_remove : Icons.person_add),
+            label: Text(isFollowing ? 'Seguindo' : 'Seguir'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isFollowing ? Colors.grey : Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

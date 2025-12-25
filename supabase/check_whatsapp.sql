@@ -11,7 +11,7 @@ WHERE whatsapp IS NOT NULL AND whatsapp != '';
 /*
 INSERT INTO veiculos (
     titulo, descricao, preco, whatsapp, cidade, estado,
-    usuario_id, status, criado_em
+    user_id, status, criado_em
 ) VALUES (
     'Carro de Teste WhatsApp',
     'Anúncio para testar funcionalidade do WhatsApp',

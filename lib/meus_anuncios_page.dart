@@ -46,7 +46,7 @@ class _MeusAnunciosPageState extends State<MeusAnunciosPage> {
       final response = await Supabase.instance.client
           .from('veiculos')
           .select()
-          .eq('usuario_id', user.id)
+          .eq('user_id', user.id)
           .order('criado_em', ascending: false);
 
       List<Map<String, dynamic>> anuncios = [];

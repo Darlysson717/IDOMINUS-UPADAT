@@ -75,7 +75,7 @@ class FavoritosRankingService {
 
 class FavoritoRankingItem {
   final String anuncioId;
-  final String usuarioId;
+  final String userId;
   final String? cidade;
   final String? estado;
   final String titulo;
@@ -86,7 +86,7 @@ class FavoritoRankingItem {
 
   const FavoritoRankingItem({
     required this.anuncioId,
-    required this.usuarioId,
+    required this.userId,
     required this.cidade,
     required this.estado,
     required this.titulo,
@@ -98,9 +98,9 @@ class FavoritoRankingItem {
 
   static FavoritoRankingItem? fromMap(Map<String, dynamic> map) {
     final anuncioId = map['veiculo_id']?.toString();
-    final usuarioId = map['usuario_id']?.toString();
+    final userId = map['user_id']?.toString();
     final tituloRaw = map['titulo']?.toString();
-    if (anuncioId == null || usuarioId == null || tituloRaw == null) {
+    if (anuncioId == null || userId == null || tituloRaw == null) {
       return null;
     }
 
@@ -115,7 +115,7 @@ class FavoritoRankingItem {
 
     return FavoritoRankingItem(
       anuncioId: anuncioId,
-      usuarioId: usuarioId,
+      userId: userId,
       cidade: map['cidade']?.toString(),
       estado: map['estado']?.toString(),
       titulo: tituloRaw,

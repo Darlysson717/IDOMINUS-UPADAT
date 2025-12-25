@@ -2,7 +2,7 @@
 create or replace view public.v_top_favoritos_15d as
 select
     f.veiculo_id,
-    v.usuario_id,
+  v.user_id,
     v.cidade,
     v.estado,
     coalesce(
@@ -27,7 +27,7 @@ from public.favoritos f
 join public.veiculos v on v.id = f.veiculo_id
 where f.created_at >= (now() - interval '15 days')
   and coalesce(v.status, 'ativo') = 'ativo'
-group by f.veiculo_id, v.usuario_id, v.cidade, v.estado, thumbnail;
+group by f.veiculo_id, v.user_id, v.cidade, v.estado, thumbnail;
 
 -- Índice auxiliar para acelerar filtros por created_at
 create index if not exists favoritos_created_at_idx on public.favoritos (created_at);

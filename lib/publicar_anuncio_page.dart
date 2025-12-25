@@ -330,7 +330,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
         'ipva_pago': _ipvaPago,
   if (fotosUrls.isNotEmpty) 'fotos': fotosUrls,
         'criado_em': DateTime.now().toIso8601String(),
-        'usuario_id': user.id,
+        'user_id': user.id,
   'status': widget.anuncio?['status'] ?? 'ativo',
         // Coordenadas GPS para localização geográfica
         if (LocationService.I.lat != null) 'lat': LocationService.I.lat,

@@ -1,15 +1,14 @@
 -- Criar tabela para vendedores seguidos pelos usuários
-CREATE TABLE IF NOT EXISTS public.vendedores_seguidos (
+DROP TABLE IF EXISTS public.vendedores_seguidos CASCADE;
+
+CREATE TABLE public.vendedores_seguidos (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     vendedor_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Garantir que um usuário não siga o mesmo vendedor duas vezes
-    UNIQUE(user_id, vendedor_id),
-
-    -- Um usuário não pode seguir a si mesmo
-    CHECK (user_id != vendedor_id)
+    UNIQUE(user_id, vendedor_id)
 );
 
 -- Índices para performance
@@ -18,6 +17,12 @@ CREATE INDEX IF NOT EXISTS idx_vendedores_seguidos_vendedor_id ON public.vendedo
 
 -- Políticas RLS (Row Level Security)
 ALTER TABLE public.vendedores_seguidos ENABLE ROW LEVEL SECURITY;
+
+-- Remover políticas existentes se houver
+DROP POLICY IF EXISTS "Users can view their own follows" ON public.vendedores_seguidos;
+DROP POLICY IF EXISTS "Users can insert their own follows" ON public.vendedores_seguidos;
+DROP POLICY IF EXISTS "Users can delete their own follows" ON public.vendedores_seguidos;
+DROP POLICY IF EXISTS "Users can update their own follows" ON public.vendedores_seguidos;
 
 -- Política: usuários podem ver apenas seus próprios follows
 CREATE POLICY "Users can view their own follows" ON public.vendedores_seguidos

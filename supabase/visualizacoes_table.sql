@@ -8,38 +8,6 @@ CREATE TABLE IF NOT EXISTS public.visualizacoes (
     viewer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
--- Alterar coluna anuncio_id para TEXT se necessário
-DO $$
-BEGIN
-    -- Dropar TODAS as políticas que podem depender da coluna
-    DROP POLICY IF EXISTS visualizacoes_select_owner ON public.visualizacoes;
-    DROP POLICY IF EXISTS visualizacoes_select_owner_anuncio ON public.visualizacoes;
-    DROP POLICY IF EXISTS visualizacoes_insert ON public.visualizacoes;
-    
-    -- Alterar tipo da coluna se for UUID
-    IF EXISTS (SELECT 1 FROM information_schema.columns 
-               WHERE table_name = 'visualizacoes' AND column_name = 'anuncio_id' AND data_type = 'uuid') THEN
-        ALTER TABLE public.visualizacoes ALTER COLUMN anuncio_id TYPE TEXT;
-    END IF;
-    
-    -- Recriar todas as políticas
-    CREATE POLICY visualizacoes_insert ON public.visualizacoes
-    FOR INSERT WITH CHECK (true);
-
-    CREATE POLICY visualizacoes_select_owner ON public.visualizacoes
-    FOR SELECT USING (auth.uid() = viewer_id OR auth.uid() IS NULL);
-
-    CREATE POLICY visualizacoes_select_owner_anuncio ON public.visualizacoes
-    FOR SELECT USING (
-      EXISTS (
-        SELECT 1
-        FROM public.veiculos v
-        WHERE v.id::text = anuncio_id
-        AND v.usuario_id = auth.uid()
-      )
-    );
-END $$;
-
 -- Adicionar coluna criado_em se não existir
 DO $$
 BEGIN
@@ -67,14 +35,14 @@ DROP POLICY IF EXISTS visualizacoes_select_owner ON public.visualizacoes;
 CREATE POLICY visualizacoes_select_owner ON public.visualizacoes
 FOR SELECT USING (auth.uid() = viewer_id OR auth.uid() IS NULL);
 
--- Dono do anúncio pode ver visualizações do seu anúncio (já recriada acima)
--- DROP POLICY IF EXISTS visualizacoes_select_owner_anuncio ON public.visualizacoes;
--- CREATE POLICY visualizacoes_select_owner_anuncio ON public.visualizacoes
--- FOR SELECT USING (
---   EXISTS (
---     SELECT 1
---     FROM public.veiculos v
---     WHERE v.id::text = anuncio_id
---     AND v.usuario_id = auth.uid()
---   )
--- );
+-- Dono do anúncio pode ver visualizações do seu anúncio
+DROP POLICY IF EXISTS visualizacoes_select_owner_anuncio ON public.visualizacoes;
+CREATE POLICY visualizacoes_select_owner_anuncio ON public.visualizacoes
+FOR SELECT USING (
+    EXISTS (
+        SELECT 1
+        FROM public.veiculos v
+        WHERE v.id::text = anuncio_id
+        AND v.user_id = auth.uid()
+    )
+);

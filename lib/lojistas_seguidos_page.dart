@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'veiculo_card.dart';
 import 'comprador_home.dart';
+import 'lojista_anuncios_page.dart';
 
 class LojistasSeguidosPage extends StatefulWidget {
   const LojistasSeguidosPage({super.key});
@@ -12,7 +12,6 @@ class LojistasSeguidosPage extends StatefulWidget {
 
 class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
   List<Map<String, dynamic>> _lojistasSeguidos = [];
-  List<Map<String, dynamic>> _veiculosDosLojistas = [];
   bool _loading = true;
 
   @override
@@ -55,51 +54,83 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
         return;
       }
 
-      // Buscar informações dos vendedores (usando dados dos veículos)
-      final vendedoresResponse = await Supabase.instance.client
+      // Buscar perfis dos vendedores seguidos
+      final profilesResponse = await Supabase.instance.client
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .filter('id', 'in', _buildInFilter(vendedorIds));
+
+      final profilesMap = <String, Map<String, dynamic>>{};
+      for (final profile in profilesResponse as List<dynamic>) {
+        final profileId = profile['id'] as String?;
+        if (profileId == null) continue;
+        profilesMap[profileId] = profile;
+      }
+
+      // Buscar informações dos vendedores apenas para os IDs seguidos
+        final vendedoresResponse = await Supabase.instance.client
           .from('veiculos')
-          .select('user_id, titulo, marca, modelo, cidade, estado')
+          .select('user_id, cidade, estado')
           .eq('status', 'ativo')
+          .filter('user_id', 'in', _buildInFilter(vendedorIds))
           .order('criado_em', ascending: false);
 
-      // Agrupar por user_id para ter info única por vendedor (apenas os que o usuário segue)
       final Map<String, Map<String, dynamic>> vendedoresMap = {};
-      for (final veiculo in vendedoresResponse as List) {
-        final userId = veiculo['user_id'] as String;
-        // Só incluir vendedores que o usuário segue
-        if (vendedorIds.contains(userId) && !vendedoresMap.containsKey(userId)) {
-          vendedoresMap[userId] = {
+      for (final veiculo in vendedoresResponse as List<dynamic>) {
+        final userId = veiculo['user_id'] as String?;
+        if (userId == null || !vendedorIds.contains(userId)) continue;
+
+        vendedoresMap.putIfAbsent(userId, () {
+          final profile = profilesMap[userId];
+          return {
             'user_id': userId,
-            'nome_loja': _extrairNomeLoja(veiculo),
+            'nome_loja': _resolveProfileName(profile),
+            'avatar_url': profile?['avatar_url'] ?? '',
             'cidade': veiculo['cidade'] ?? '',
             'estado': veiculo['estado'] ?? '',
-            'total_anuncios': 0, // Será calculado depois
+            'total_anuncios': 0,
           };
+        });
+
+        vendedoresMap[userId]!['total_anuncios'] =
+            (vendedoresMap[userId]!['total_anuncios'] as int? ?? 0) + 1;
+
+        final cidadeRegistrada = (vendedoresMap[userId]!['cidade'] as String?)?.trim() ?? '';
+        if (cidadeRegistrada.isEmpty && veiculo['cidade'] != null) {
+          vendedoresMap[userId]!['cidade'] = veiculo['cidade'];
+        }
+
+        final estadoRegistrado = (vendedoresMap[userId]!['estado'] as String?)?.trim() ?? '';
+        if (estadoRegistrado.isEmpty && veiculo['estado'] != null) {
+          vendedoresMap[userId]!['estado'] = veiculo['estado'];
         }
       }
 
-      // Contar total de anúncios por vendedor
+      // Garantir que todos os vendedores apareçam mesmo sem anúncios ativos
       for (final vendedorId in vendedorIds) {
-        final countResponse = await Supabase.instance.client
-            .from('veiculos')
-            .select('id')
-            .eq('user_id', vendedorId)
-            .eq('status', 'ativo');
-
-        if (vendedoresMap.containsKey(vendedorId)) {
-          vendedoresMap[vendedorId]!['total_anuncios'] = (countResponse as List).length;
-        }
+        vendedoresMap.putIfAbsent(vendedorId, () {
+          final profile = profilesMap[vendedorId];
+          return {
+            'user_id': vendedorId,
+            'nome_loja': _resolveProfileName(profile),
+            'avatar_url': profile?['avatar_url'] ?? '',
+            'cidade': '',
+            'estado': '',
+            'total_anuncios': 0,
+          };
+        });
       }
 
       if (mounted) {
         setState(() {
-          _lojistasSeguidos = vendedoresMap.values.toList();
+          _lojistasSeguidos = vendedoresMap.values.toList()
+            ..sort((a, b) => (a['nome_loja'] ?? 'Lojista')
+                .toString()
+                .toLowerCase()
+                .compareTo((b['nome_loja'] ?? 'Lojista').toString().toLowerCase()));
           _loading = false;
         });
       }
-
-      // Carregar veículos dos lojistas seguidos
-      await _carregarVeiculosDosLojistas();
 
     } catch (e) {
       print('Erro ao carregar lojistas seguidos: $e');
@@ -109,56 +140,18 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
     }
   }
 
-  String _extrairNomeLoja(Map<String, dynamic> veiculo) {
-    // Tentar extrair nome da loja do título do anúncio
-    final titulo = veiculo['titulo'] as String? ?? '';
-    if (titulo.isNotEmpty) {
-      // Se o título contém palavras como "Loja", "Concessionária", etc.
-      if (titulo.toLowerCase().contains('loja') ||
-          titulo.toLowerCase().contains('concessionária') ||
-          titulo.toLowerCase().contains('auto') ||
-          titulo.length > 30) { // Títulos longos provavelmente são nomes de lojas
-        return titulo;
-      }
-    }
-
-    // Fallback: usar marca + modelo
-    final marca = veiculo['marca'] as String? ?? '';
-    final modelo = veiculo['modelo'] as String? ?? '';
-    if (marca.isNotEmpty && modelo.isNotEmpty) {
-      return '$marca $modelo';
-    }
-
-    return 'Lojista';
+  String _resolveProfileName(Map<String, dynamic>? profile) {
+    final raw = (profile?['name'] as String?)?.trim();
+    return (raw != null && raw.isNotEmpty) ? raw : 'Lojista';
   }
 
-  Future<void> _carregarVeiculosDosLojistas() async {
-    if (_lojistasSeguidos.isEmpty) return;
-
-    try {
-      final vendedorIds = _lojistasSeguidos.map((l) => l['user_id'] as String).toList();
-
-      final response = await Supabase.instance.client
-          .from('veiculos')
-          .select()
-          .eq('status', 'ativo')
-          .order('criado_em', ascending: false)
-          .limit(50); // Limitar para performance
-
-      // Filtrar apenas veículos dos vendedores seguidos
-      final veiculosFiltrados = (response as List<dynamic>)
-          .where((veiculo) => vendedorIds.contains(veiculo['user_id']))
-          .cast<Map<String, dynamic>>()
-          .toList();
-
-      if (mounted) {
-        setState(() {
-          _veiculosDosLojistas = veiculosFiltrados;
-        });
-      }
-    } catch (e) {
-      print('Erro ao carregar veículos dos lojistas: $e');
-    }
+  String _buildInFilter(List<String> values) {
+    final sanitized = values
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .map((value) => '"$value"')
+        .join(',');
+    return '($sanitized)';
   }
 
   Future<void> _desseguirVendedor(String vendedorId) async {
@@ -188,79 +181,6 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
         );
       }
     }
-  }
-
-  // Helper method to extract vehicle data (same logic as comprador_home.dart)
-  Map<String, String> _extractVehicleData(Map<String, dynamic> veiculo) {
-    final String foto = (() {
-      final thumbs = veiculo['fotos_thumb'];
-      if (thumbs is List && thumbs.isNotEmpty && thumbs.first is String) {
-        return thumbs.first as String;
-      }
-      final f = veiculo['foto'];
-      if (f is String && f.isNotEmpty) return f;
-      final fotos = veiculo['fotos'];
-      if (fotos is List && fotos.isNotEmpty) {
-        final first = fotos.first;
-        if (first is String) return first;
-      }
-      return '';
-    })();
-
-    final String nome = (() {
-      if (veiculo['nome'] is String && (veiculo['nome'] as String).trim().isNotEmpty) {
-        return veiculo['nome'];
-      }
-      if (veiculo['titulo'] is String && (veiculo['titulo'] as String).trim().isNotEmpty) {
-        return veiculo['titulo'];
-      }
-      final parts = [
-        veiculo['marca'],
-        veiculo['modelo'],
-        veiculo['versao'],
-      ].whereType<String>().map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      if (parts.isNotEmpty) return parts.join(' ');
-      return 'Veículo';
-    })();
-
-    final dynamic precoRaw = veiculo['preco'];
-    final String preco = (() {
-      if (precoRaw == null) return 'Preço a consultar';
-      if (precoRaw is num) {
-        return 'R\$ ${precoRaw.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
-      }
-      return precoRaw.toString();
-    })();
-
-    final String ano = (() {
-      final a = veiculo['ano_modelo'] ?? veiculo['ano_fab'] ?? veiculo['ano'];
-      if (a == null) return '-';
-      return a.toString();
-    })();
-
-    final String quilometragem = (() {
-      final q = veiculo['km'] ?? veiculo['quilometragem'];
-      if (q == null) return '-';
-      return '${q.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} km';
-    })();
-
-    final String cidadeEstado = (() {
-      final c = veiculo['cidade'];
-      final e = veiculo['estado'];
-      if (c == null && e == null) return '-';
-      final parts = [c, e].whereType<String>().map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      if (parts.isEmpty) return '-';
-      return parts.join(' - ');
-    })();
-
-    return {
-      'foto': foto,
-      'nome': nome,
-      'preco': preco,
-      'ano': ano,
-      'quilometragem': quilometragem,
-      'cidadeEstado': cidadeEstado,
-    };
   }
 
   @override
@@ -381,69 +301,6 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
             childCount: _lojistasSeguidos.length,
           ),
         ),
-
-        // Veículos dos lojistas
-        if (_veiculosDosLojistas.isNotEmpty) ...[
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Anúncios dos lojistas seguidos',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black87,
-                ),
-              ),
-            ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.75,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final veiculo = _veiculosDosLojistas[index];
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/detalhes',
-                        arguments: veiculo,
-                      );
-                    },
-                    child: VeiculoCard(
-                      foto: _extractVehicleData(veiculo)['foto']!,
-                      nome: _extractVehicleData(veiculo)['nome']!,
-                      preco: _extractVehicleData(veiculo)['preco']!,
-                      ano: _extractVehicleData(veiculo)['ano']!,
-                      quilometragem: _extractVehicleData(veiculo)['quilometragem']!,
-                      cidadeEstado: _extractVehicleData(veiculo)['cidadeEstado']!,
-                      badge: '',
-                      onVerDetalhes: () {
-                        Navigator.pushNamed(
-                          context,
-                          '/detalhes',
-                          arguments: veiculo,
-                        );
-                      },
-                    ),
-                  );
-                },
-                childCount: _veiculosDosLojistas.length,
-              ),
-            ),
-          ),
-        ],
-
         const SliverToBoxAdapter(
           child: SizedBox(height: 20),
         ),
@@ -454,23 +311,41 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
   Widget _buildLojistaCard(Map<String, dynamic> lojista) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final avatarUrl = (lojista['avatar_url'] as String?)?.trim() ?? '';
+    final cidade = (lojista['cidade'] as String?)?.trim() ?? '';
+    final estado = (lojista['estado'] as String?)?.trim() ?? '';
+    final localizacao = [cidade, estado].where((part) => part.isNotEmpty).join(' - ');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LojistaAnunciosPage(lojista: lojista),
+            ),
+          );
+          _carregarLojistasSeguidos();
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
             // Avatar do lojista
             CircleAvatar(
               radius: 24,
               backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[200],
-              child: Icon(
-                Icons.store,
-                color: isDark ? Colors.white : Colors.grey[600],
-              ),
+              backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+              child: avatarUrl.isNotEmpty
+                  ? null
+                  : Icon(
+                      Icons.person,
+                      color: isDark ? Colors.white : Colors.grey[600],
+                    ),
             ),
             const SizedBox(width: 12),
 
@@ -491,7 +366,7 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${lojista['cidade'] ?? ''} ${lojista['estado'] ?? ''}'.trim(),
+                    localizacao.isNotEmpty ? localizacao : 'Localização indisponível',
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark ? Colors.white.withValues(alpha: 0.7) : Colors.grey[600],
@@ -521,6 +396,7 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

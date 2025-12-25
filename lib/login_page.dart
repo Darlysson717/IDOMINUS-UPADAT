@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/update_service.dart';
+import 'services/profile_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -105,6 +106,8 @@ class _LoginPageState extends State<LoginPage> {
 
       if (user != null) {
         timer.cancel();
+        // Sincronizar perfil após login
+        unawaited(ProfileService().syncProfileFromAuth());
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/home');
         }

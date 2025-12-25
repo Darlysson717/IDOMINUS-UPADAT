@@ -49,6 +49,7 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
   // Dados para carrosséis
   List<Map<String, dynamic>> _recommendedVehicles = [];
   bool _loadingRecommended = true;
+  bool _hasLoadedRecommendations = false;
 
   // Controle de verificação de atualizações
   DateTime? _lastUpdateCheck;
@@ -179,7 +180,10 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
 
   Future<void> _loadRecommendedVehicles() async {
     if (mounted) {
-      setState(() => _loadingRecommended = true);
+      setState(() {
+        _loadingRecommended = true;
+        _hasLoadedRecommendations = false;
+      });
     }
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -192,11 +196,15 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
         setState(() {
           _recommendedVehicles = recommendations;
           _loadingRecommended = false;
+          _hasLoadedRecommendations = true;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _loadingRecommended = false);
+        setState(() {
+          _loadingRecommended = false;
+          _hasLoadedRecommendations = true;
+        });
       }
       debugPrint('Erro ao carregar recomendações: $e');
     }
@@ -449,6 +457,9 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
       }
       return busca && filtro && marcaOk && modeloOk && anoMinOk && anoMaxOk && precoMinOk && precoMaxOk && kmMinOk && kmMaxOk && corOk && combustivelOk && cambioOk && motorizacaoOk && numPortasOk && condicaoOk && carroceriaOk && direcaoOk && faroisOk && situacaoVeiculoOk && localCidadeOk;
     }).toList();
+
+    final bool shouldShowRecommendationsCarousel =
+      _loadingRecommended || _hasLoadedRecommendations;
 
     // nenhuma ordenação especial agora que filtro 'Novos' foi removido
 
@@ -738,6 +749,16 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: primaryColor.withValues(alpha: 0.5)),
                               ),
+                                if (shouldShowRecommendationsCarousel) ...[
+                                  const SizedBox(height: 32),
+                                  VehicleCarousel(
+                                    title: 'Recomendações para Você',
+                                    vehicles: _recommendedVehicles,
+                                    isLoading: _loadingRecommended,
+                                    simpleMode: true,
+                                    emptyMessage: 'Nenhuma recomendação disponível no momento.',
+                                  ),
+                                ],
                             ],
                           ),
                         ),
@@ -747,7 +768,7 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                         padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 24),
                         sliver: SliverList(
                           delegate: (() {
-                            final bool showRecommendationsCarousel = Supabase.instance.client.auth.currentUser != null;
+                            final bool showRecommendationsCarousel = shouldShowRecommendationsCarousel;
                             final int carouselInsertIndex = showRecommendationsCarousel
                                 ? (veiculosFiltrados.length >= 5 ? 5 : veiculosFiltrados.length)
                                 : -1;

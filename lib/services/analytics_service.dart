@@ -65,7 +65,7 @@ class AnalyticsService {
       rawVeiculos = await _client
           .from('veiculos')
           .select()
-          .eq('usuario_id', user.id);
+          .eq('user_id', user.id);
     } catch (error) {
       throw Exception('Não foi possível carregar seus anúncios: $error');
     }

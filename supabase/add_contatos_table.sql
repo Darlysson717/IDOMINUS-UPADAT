@@ -10,15 +10,17 @@ create table if not exists public.contatos (
 alter table public.contatos enable row level security;
 
 -- Vendedores podem ver contatos dos próprios anúncios
+drop policy if exists "Vendedores veem contatos dos proprios anuncios" on public.contatos;
 create policy "Vendedores veem contatos dos proprios anuncios" on public.contatos
     for select using (
         exists (
             select 1 from public.veiculos
             where veiculos.id::text = contatos.anuncio_id
-            and veiculos.usuario_id = auth.uid()
+            and veiculos.user_id = auth.uid()
         )
     );
 
 -- Usuários podem inserir contatos (compradores clicando)
+drop policy if exists "Usuarios podem inserir contatos" on public.contatos;
 create policy "Usuarios podem inserir contatos" on public.contatos
     for insert with check (auth.uid() = user_id);

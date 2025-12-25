@@ -10,7 +10,7 @@ using (
     select 1
       from public.veiculos v
      where v.id = veiculo_id
-        and v.usuario_id = auth.uid()
+        and v.user_id = auth.uid()
   )
 );
 

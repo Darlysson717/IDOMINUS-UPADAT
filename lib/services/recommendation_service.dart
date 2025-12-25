@@ -17,14 +17,21 @@ class RecommendationService {
     bool forceRefresh = false,
   }) async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return [];
+    final cacheKey = user?.id ?? 'guest';
 
     // Verificar cache (válido por 30 minutos)
     if (!forceRefresh &&
-        _recommendationsCache.containsKey(user.id) &&
+        _recommendationsCache.containsKey(cacheKey) &&
         _lastCacheUpdate != null &&
         DateTime.now().difference(_lastCacheUpdate!) < const Duration(minutes: 30)) {
-      return _recommendationsCache[user.id]!;
+      return _recommendationsCache[cacheKey]!;
+    }
+
+    if (user == null) {
+      final popular = await _getPopularRecentVehicles(limit);
+      _recommendationsCache[cacheKey] = popular;
+      _lastCacheUpdate = DateTime.now();
+      return popular;
     }
 
     try {
@@ -45,7 +52,7 @@ class RecommendationService {
       final favoritesResponse = await Supabase.instance.client
           .from('favoritos')
           .select('veiculo_id')
-          .eq('usuario_id', user.id);
+          .eq('user_id', user.id);
 
       final favoriteIds = (favoritesResponse as List)
           .map((f) => f['veiculo_id']?.toString())
@@ -76,21 +83,22 @@ class RecommendationService {
       // Buscar detalhes dos anúncios interagidos para análise de padrões
       List<Map<String, dynamic>> interactedVehicles = [];
       if (allInteractedIds.isNotEmpty) {
-        // Para cada ID, fazer uma query separada (não ideal, mas funciona)
-        for (final id in allInteractedIds) {
-          if (id != null) {
-            try {
-              final vehicle = await Supabase.instance.client
-                  .from('veiculos')
-                  .select('marca, modelo, preco, condicao, combustivel, cambio, carroceria')
-                  .eq('id', id)
-                  .eq('status', 'ativo')
-                  .single();
-              interactedVehicles.add(vehicle);
-            } catch (e) {
-              // Ignorar erros para IDs individuais
+        for (final id in allInteractedIds.whereType<String>()) {
+          Map<String, dynamic>? vehicle;
+          try {
+            vehicle = await _fetchVehicleDetails(id, onlyActive: true);
+          } on PostgrestException catch (error) {
+            if (error.code == '42703') {
+              vehicle = await _fetchVehicleDetails(id, onlyActive: false);
+            } else {
               continue;
             }
+          } catch (_) {
+            continue;
+          }
+
+          if (vehicle != null) {
+            interactedVehicles.add(vehicle);
           }
         }
       }
@@ -100,18 +108,21 @@ class RecommendationService {
 
       // 6. Buscar recomendações baseadas nas preferências
       final validIds = allInteractedIds.whereType<String>().toList();
-      final recommendations = await _getRecommendationsBasedOnPreferences(
+      var recommendations = await _getRecommendationsBasedOnPreferences(
         preferences,
         excludeIds: validIds,
         limit: limit,
       );
 
-      // 7. Ordenar por relevância
-      recommendations.sort((a, b) => _calculateRelevanceScore(b, preferences)
-          .compareTo(_calculateRelevanceScore(a, preferences)));
+      if (recommendations.isEmpty) {
+        recommendations = await _getPopularRecentVehicles(limit);
+      } else {
+        recommendations.sort((a, b) => _calculateRelevanceScore(b, preferences)
+            .compareTo(_calculateRelevanceScore(a, preferences)));
+      }
 
       // Cache das recomendações
-      _recommendationsCache[user.id] = recommendations.take(limit).toList();
+      _recommendationsCache[cacheKey] = recommendations.take(limit).toList();
       _lastCacheUpdate = DateTime.now();
 
       return recommendations.take(limit).toList();
@@ -192,7 +203,7 @@ class RecommendationService {
     required List<String> excludeIds,
     required int limit,
   }) async {
-    try {
+    Future<List<Map<String, dynamic>>> fetch({required bool onlyActive}) async {
       // Aplicar filtros baseados nas preferências mais fortes
       final marcas = preferences['marcas'] as Map<String, int>;
       final marcaMaisFrequente = marcas.entries
@@ -208,15 +219,17 @@ class RecommendationService {
 
       var query = Supabase.instance.client
           .from('veiculos')
-          .select()
-          .eq('status', 'ativo');
+          .select();
 
-      // Excluir IDs já interagidos
-      if (excludeIds.isNotEmpty) {
-        query = query.not('id', 'in', '(${excludeIds.join(',')})');
+      if (onlyActive) {
+        query = query.eq('status', 'ativo');
       }
 
-      // Aplicar filtros de preferência
+      if (excludeIds.isNotEmpty) {
+        final formattedIds = excludeIds.join(',');
+        query = query.not('id', 'in', '($formattedIds)');
+      }
+
       if (marcaMaisFrequente != null) {
         query = query.ilike('marca', '%${marcaMaisFrequente.key}%');
       }
@@ -225,13 +238,21 @@ class RecommendationService {
         query = query.eq('carroceria', carroceriaMaisFrequente.key);
       }
 
-      // Aplicar paginação e ordenação
       final response = await query
           .order('criado_em', ascending: false)
-          .limit(limit * 2); // Buscar mais para ter opções de filtrar
+          .limit(limit * 2);
 
       return List<Map<String, dynamic>>.from(response as List);
+    }
 
+    try {
+      return await fetch(onlyActive: true);
+    } on PostgrestException catch (error) {
+      if (error.code == '42703') {
+        return await fetch(onlyActive: false);
+      }
+      print('Erro ao buscar recomendações baseadas em preferências: $error');
+      return [];
     } catch (e) {
       print('Erro ao buscar recomendações baseadas em preferências: $e');
       return [];
@@ -241,26 +262,44 @@ class RecommendationService {
   // Fallback: anúncios populares recentes
   Future<List<Map<String, dynamic>>> _getPopularRecentVehicles(int limit) async {
     try {
-      // Buscar anúncios recentes (simplificado - sem contagem de visualizações por enquanto)
-      print('Buscando anúncios populares recentes, limite: $limit');
-      final response = await Supabase.instance.client
-          .from('veiculos')
-          .select()
-          .eq('status', 'ativo')
-          .order('criado_em', ascending: false)
-          .limit(limit);
-
-      final vehicles = List<Map<String, dynamic>>.from(response as List);
-      print('Encontrados ${vehicles.length} anúncios populares recentes');
-
-      // Por enquanto, apenas retornar os veículos mais recentes
-      // TODO: Implementar sistema de visualizações se necessário
-      return vehicles;
-
+      return await _fetchRecentVehicles(limit, onlyActive: true);
+    } on PostgrestException catch (error) {
+      if (error.code == '42703') {
+        return await _fetchRecentVehicles(limit, onlyActive: false);
+      }
+      print('Erro ao buscar veículos populares: $error');
+      return [];
     } catch (e) {
       print('Erro ao buscar veículos populares: $e');
       return [];
     }
+  }
+
+  Future<Map<String, dynamic>?> _fetchVehicleDetails(String id, {bool onlyActive = true}) async {
+    var query = Supabase.instance.client
+        .from('veiculos')
+        .select('marca, modelo, preco, condicao, combustivel, cambio, carroceria')
+        .eq('id', id);
+
+    if (onlyActive) {
+      query = query.eq('status', 'ativo');
+    }
+
+    final response = await query.single();
+    return Map<String, dynamic>.from(response as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRecentVehicles(int limit, {bool onlyActive = true}) async {
+    var query = Supabase.instance.client
+        .from('veiculos')
+        .select();
+
+    if (onlyActive) {
+      query = query.eq('status', 'ativo');
+    }
+
+    final response = await query.order('criado_em', ascending: false).limit(limit);
+    return List<Map<String, dynamic>>.from(response as List);
   }
 
   // Calcular score de relevância para um veículo

@@ -14,6 +14,7 @@ import 'services/update_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
 import 'services/analytics_service.dart';
+import 'services/profile_service.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
 class PerfilPage extends StatelessWidget {
@@ -27,6 +28,11 @@ class PerfilPage extends StatelessWidget {
     final fotoUrl = user?.userMetadata?['avatar_url'] ?? '';
     final isSmall = MediaQuery.of(context).size.width < 400;
     final userId = user?.id;
+
+    // Sincronizar perfil com metadados do auth
+    if (user != null) {
+      ProfileService().syncProfileFromAuth();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -646,7 +652,7 @@ Future<Map<String, int>> _loadUserStats(String userId) async {
     final anunciosResponse = await client
         .from('veiculos')
         .select()
-        .eq('usuario_id', userId);
+      .eq('user_id', userId);
 
     int anunciosCount = 0;
     try {
