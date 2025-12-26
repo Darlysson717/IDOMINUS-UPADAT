@@ -1,6 +1,6 @@
 {
-  "version": "1.0.8",
-  "apkUrl": "https://github.com/Darlysson717/IDOMINUS-UPADAT/releases/download/v1.0.8/app-release.apk",
-  "changelog": "• Limitação de imagens reduzida para 5 por anúncio (otimização de armazenamento)\n• Sistema de exclusão completa de anúncios implementado (remove imagens do storage)\n• Nova aba de manutenção no painel administrativo\n• Limpeza automática de imagens órfãs\n• Correção de problemas de conectividade em release builds\n• Melhorias na estabilidade e performance\n• Otimização de uso de armazenamento do banco de dados",
+  "version": "1.0.9",
+  "apkUrl": "https://github.com/Darlysson717/IDOMINUS-UPADAT/releases/download/v1.0.9/app-release.apk",
+  "changelog": "• Atualização forçada implementada para garantir que todos os usuários estejam na versão mais recente\n• Correções de erros de código e melhorias na estabilidade\n• Otimização de performance e redução de bugs\n• Melhorias na interface de atualização obrigatória",
   "forceUpdate": false
 }
