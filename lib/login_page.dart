@@ -28,35 +28,37 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _checkForUpdate() async {
     final updateInfo = await UpdateService.checkForUpdate();
     if (updateInfo != null) {
-      final currentVersion = await UpdateService.getCurrentVersion();
-      if (UpdateService.compareVersions(currentVersion, updateInfo['version']) < 0) {
-        _showUpdateDialog(updateInfo);
-      }
+      _showUpdateDialog(updateInfo);
     }
   }
 
   void _showUpdateDialog(Map<String, dynamic> updateInfo) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Nova versão disponível'),
-        content: Text('Versão ${updateInfo['version']} está disponível. Deseja atualizar agora?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Versão ${updateInfo['version']} está disponível.'),
+            const SizedBox(height: 8),
+            const Text('Atualize o app para continuar usando.'),
+            const SizedBox(height: 8),
+            const Text('Abriremos a loja/navegador para fazer o download oficial.'),
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Depois'),
-          ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(context).pop();
               try {
-                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Download iniciado. Verifique as notificações do dispositivo.'))
-                );
+                await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Erro na atualização: $e'))
+                  SnackBar(content: Text('Erro ao abrir a atualização: $e'))
                 );
               }
             },

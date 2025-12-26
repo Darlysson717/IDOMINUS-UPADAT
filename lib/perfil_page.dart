@@ -1,6 +1,16 @@
 
 
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'comprador_home.dart';
 import 'publicar_anuncio_page.dart';
@@ -15,10 +25,11 @@ import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
 import 'services/analytics_service.dart';
 import 'services/profile_service.dart';
+import 'lojista_anuncios_page.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
 class PerfilPage extends StatelessWidget {
-  const PerfilPage({Key? key}) : super(key: key);
+  const PerfilPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +43,55 @@ class PerfilPage extends StatelessWidget {
     // Sincronizar perfil com metadados do auth
     if (user != null) {
       ProfileService().syncProfileFromAuth();
+    }
+
+    final quickActionCards = <Widget>[
+      _PerfilQuickActionCard(
+        icon: Icons.directions_car,
+        label: 'Meus Anúncios',
+        color: Colors.deepPurple,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const MeusAnunciosPage()),
+        ),
+      ),
+      _PerfilQuickActionCard(
+        icon: Icons.add_box,
+        label: 'Publicar',
+        color: Colors.green,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PublicarAnuncioPage()),
+          );
+        },
+      ),
+      _PerfilQuickActionCard(
+        icon: Icons.bar_chart,
+        label: 'Visualizações',
+        color: Colors.orange,
+        onTap: () => Navigator.of(context).pushNamed('/visualizacoes'),
+      ),
+      _PerfilQuickActionCard(
+        icon: Icons.business,
+        label: 'Sobre o Dominus',
+        color: Colors.blue,
+        onTap: () => Navigator.of(context).pushNamed('/sobre-dominus'),
+      ),
+    ];
+
+    if (userId != null) {
+      quickActionCards.add(
+        _PerfilQuickActionCard(
+          icon: Icons.qr_code_2,
+          label: 'Link da Loja',
+          color: Colors.indigo,
+          onTap: () => _showSellerShareSheet(
+            context,
+            userId: userId,
+            nome: nome,
+            fotoUrl: fotoUrl,
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -54,8 +114,8 @@ class PerfilPage extends StatelessWidget {
                     CircleAvatar(
                       radius: isSmall ? 38 : 48,
                       backgroundImage: fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
-                      child: fotoUrl.isEmpty ? const Icon(Icons.person, size: 44, color: Colors.white70) : null,
                       backgroundColor: Colors.deepPurple[200],
+                      child: fotoUrl.isEmpty ? const Icon(Icons.person, size: 44, color: Colors.white70) : null,
                     ),
                     const SizedBox(height: 14),
                     Text(
@@ -243,8 +303,8 @@ class PerfilPage extends StatelessWidget {
                         CircleAvatar(
                           radius: isSmall ? 40 : 48,
                           backgroundImage: fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
-                          child: fotoUrl.isEmpty ? const Icon(Icons.person, size: 36, color: Colors.white70) : null,
                           backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          child: fotoUrl.isEmpty ? const Icon(Icons.person, size: 36, color: Colors.white70) : null,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -339,38 +399,7 @@ class PerfilPage extends StatelessWidget {
               crossAxisSpacing: 14,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _PerfilQuickActionCard(
-                  icon: Icons.directions_car,
-                  label: 'Meus Anúncios',
-                  color: Colors.deepPurple,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MeusAnunciosPage()),
-                  ),
-                ),
-                _PerfilQuickActionCard(
-                  icon: Icons.add_box,
-                  label: 'Publicar',
-                  color: Colors.green,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PublicarAnuncioPage()),
-                    );
-                  },
-                ),
-                _PerfilQuickActionCard(
-                  icon: Icons.bar_chart,
-                  label: 'Visualizações',
-                  color: Colors.orange,
-                  onTap: () => Navigator.of(context).pushNamed('/visualizacoes'),
-                ),
-                _PerfilQuickActionCard(
-                  icon: Icons.business,
-                  label: 'Sobre o Dominus',
-                  color: Colors.blue,
-                  onTap: () => Navigator.of(context).pushNamed('/sobre-dominus'),
-                ),
-              ],
+              children: quickActionCards,
             ),
           ],
         ),
@@ -414,8 +443,253 @@ class PerfilPage extends StatelessWidget {
     );
   }
 
+  void _showSellerShareSheet(
+    BuildContext context, {
+    required String userId,
+    required String nome,
+    required String fotoUrl,
+  }) {
+    final storeLink = _buildSellerShareLink(userId);
+    final shareMessage = 'Confira meus anúncios no Dominus: $storeLink';
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final bottomPadding = MediaQuery.of(sheetContext).viewPadding.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(Icons.qr_code_2, size: 36, color: Colors.deepPurple),
+              const SizedBox(height: 8),
+              Text(
+                'Compartilhe seus anúncios',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Envie o link ou o QR Code para que os clientes pulsem direto na sua vitrine do Dominus.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: storeLink,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                  version: QrVersions.auto,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: theme.brightness == Brightness.dark ? 0.4 : 0.6),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SelectableText(
+                  storeLink,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.share),
+                    label: const Text('Compartilhar link'),
+                    onPressed: () => Share.share(shareMessage, subject: 'Meus anúncios Dominus'),
+                  ),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copiar link'),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: storeLink));
+                      if (sheetContext.mounted) {
+                        ScaffoldMessenger.of(sheetContext).showSnackBar(
+                          const SnackBar(content: Text('Link copiado para a área de transferência')),
+                        );
+                      }
+                    },
+                  ),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('Baixar QR em PDF'),
+                    onPressed: () => _exportSellerQrAsPdf(
+                      sheetContext,
+                      storeLink: storeLink,
+                      nome: nome,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.storefront),
+                label: const Text('Ver meus anúncios'),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => LojistaAnunciosPage(
+                        lojista: {
+                          'user_id': userId,
+                          'nome_loja': nome,
+                          'avatar_url': fotoUrl,
+                          'cidade': '',
+                          'estado': '',
+                          'total_anuncios': 0,
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _buildSellerShareLink(String userId) => 'https://domin.us/seller_redirect.html?seller=$userId';
+
+  Future<void> _exportSellerQrAsPdf(
+    BuildContext context, {
+    required String storeLink,
+    required String nome,
+  }) async {
+    try {
+      final validation = QrValidator.validate(
+        data: storeLink,
+        version: QrVersions.auto,
+        errorCorrectionLevel: QrErrorCorrectLevel.M,
+      );
+
+      if (validation.status != QrValidationStatus.valid || validation.qrCode == null) {
+        throw Exception('Não foi possível validar o QR Code.');
+      }
+
+      final painter = QrPainter.withQr(
+        qr: validation.qrCode!,
+        gapless: true,
+      );
+
+      final imageData = await painter.toImageData(600, format: ui.ImageByteFormat.png);
+      if (imageData == null) {
+        throw Exception('Falha ao renderizar o QR Code.');
+      }
+
+      final qrBytes = imageData.buffer.asUint8List();
+      final pw.Document doc = pw.Document();
+      final qrImage = pw.MemoryImage(qrBytes);
+
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(48),
+          build: (pw.Context pdfContext) {
+            return pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text(
+                  'Dominus',
+                  style: pw.TextStyle(
+                    fontSize: 28,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.deepPurple,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  nome,
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.SizedBox(height: 24),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.deepPurple, width: 2),
+                    borderRadius: pw.BorderRadius.circular(16),
+                  ),
+                  child: pw.Image(qrImage, width: 220, height: 220),
+                ),
+                pw.SizedBox(height: 24),
+                pw.Text(
+                  'Aponte a câmera para acessar os anúncios:',
+                  style: pw.TextStyle(fontSize: 14),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey200,
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text(
+                    storeLink,
+                    style: pw.TextStyle(fontSize: 12),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await doc.save();
+      final directory = await getTemporaryDirectory();
+      final filename = 'dominustore_qr_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final file = File('${directory.path}/$filename');
+      await file.writeAsBytes(pdfBytes, flush: true);
+
+      final openResult = await OpenFile.open(file.path);
+      if (context.mounted) {
+        final message = openResult.type == ResultType.done
+            ? 'PDF salvo em ${file.path}'
+            : 'PDF salvo em ${file.path}. Não foi possível abrir automaticamente.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao gerar PDF: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _checkForUpdates(BuildContext context) async {
-    print('🔍 Verificando atualizações manualmente...');
     
     // Mostrar loading
     showDialog(
@@ -441,20 +715,8 @@ class PerfilPage extends StatelessWidget {
       }
 
       if (updateInfo != null) {
-        final currentVersion = await UpdateService.getCurrentVersion();
-        final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
-
-        if (comparison < 0) {
+        if (context.mounted) {
           _showUpdateDialog(context, updateInfo);
-        } else {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Você já está na versão mais recente!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
         }
       } else {
         if (context.mounted) {
@@ -486,6 +748,7 @@ class PerfilPage extends StatelessWidget {
   void _showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Nova versão disponível'),
         content: Column(
@@ -493,6 +756,8 @@ class PerfilPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Versão ${updateInfo['version']} está disponível.'),
+            const SizedBox(height: 8),
+            const Text('Atualize o app para continuar usando.'),
             const SizedBox(height: 8),
             if (updateInfo['changelog'] != null)
               Text(
@@ -502,20 +767,16 @@ class PerfilPage extends StatelessWidget {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Depois'),
-          ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(context).pop();
               try {
-                await UpdateService.downloadAndInstallUpdate(updateInfo['apkUrl']);
+                await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+                if (context.mounted) Navigator.of(context).pop();
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Erro ao baixar atualização: $e'),
+                      content: Text('Erro ao abrir a página de atualização: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -688,8 +949,7 @@ class _PerfilQuickActionCard extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onTap,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

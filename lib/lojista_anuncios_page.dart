@@ -4,9 +4,11 @@ import 'veiculo_card.dart';
 import 'services/follow_service.dart';
 
 class LojistaAnunciosPage extends StatefulWidget {
-  final Map<String, dynamic> lojista;
+  final Map<String, dynamic>? lojista;
+  final String? sellerId;
 
-  const LojistaAnunciosPage({super.key, required this.lojista});
+  const LojistaAnunciosPage({super.key, this.lojista, this.sellerId})
+      : assert(lojista != null || sellerId != null, 'É necessário informar um lojista ou sellerId');
 
   @override
   State<LojistaAnunciosPage> createState() => _LojistaAnunciosPageState();
@@ -17,10 +19,31 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
   bool _loading = true;
   bool _isFollowing = false;
   bool _loadingFollow = false;
+  Map<String, dynamic>? _lojistaInfo;
+  String? _sellerUserId;
+  bool _loadingLojista = false;
 
   @override
   void initState() {
     super.initState();
+    _lojistaInfo = widget.lojista;
+    _sellerUserId = widget.lojista?['user_id'] as String? ?? widget.sellerId;
+
+    if (_sellerUserId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível carregar este lojista.')),
+        );
+        Navigator.of(context).maybePop();
+      });
+      return;
+    }
+
+    if (_lojistaInfo == null) {
+      _carregarLojistaInfo();
+    }
+
     _carregarAnuncios();
     _checkIfFollowing();
   }
@@ -30,17 +53,25 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
       setState(() => _loading = true);
     }
 
+    final sellerUserId = _sellerUserId;
+    if (sellerUserId == null) {
+      return;
+    }
+
     try {
       final response = await Supabase.instance.client
           .from('veiculos')
           .select()
-          .eq('user_id', widget.lojista['user_id'])
+          .eq('user_id', sellerUserId)
           .eq('status', 'ativo')
           .order('criado_em', ascending: false);
 
       if (mounted) {
         setState(() {
           _veiculos = (response as List<dynamic>).cast<Map<String, dynamic>>();
+          final info = Map<String, dynamic>.from(_lojistaInfo ?? {'user_id': sellerUserId});
+          info['total_anuncios'] = _veiculos.length;
+          _lojistaInfo = info;
         });
       }
     } catch (e) {
@@ -57,7 +88,7 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
   }
 
   Future<void> _checkIfFollowing() async {
-    final sellerUserId = widget.lojista['user_id'] as String?;
+    final sellerUserId = _sellerUserId;
     if (sellerUserId == null) return;
 
     try {
@@ -71,7 +102,7 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
   }
 
   Future<void> _toggleFollow() async {
-    final sellerUserId = widget.lojista['user_id'] as String?;
+    final sellerUserId = _sellerUserId;
     if (sellerUserId == null) return;
 
     if (mounted) {
@@ -101,14 +132,77 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
     }
   }
 
+  Future<void> _carregarLojistaInfo() async {
+    final sellerUserId = _sellerUserId;
+    if (sellerUserId == null) return;
+
+    if (mounted) {
+      setState(() => _loadingLojista = true);
+    }
+
+    try {
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .eq('id', sellerUserId)
+          .maybeSingle();
+
+      final locationResponse = await Supabase.instance.client
+          .from('veiculos')
+          .select('cidade, estado')
+          .eq('user_id', sellerUserId)
+          .eq('status', 'ativo')
+          .limit(1) as List<dynamic>;
+
+      Map<String, dynamic>? location;
+      if (locationResponse.isNotEmpty) {
+        final first = locationResponse.first;
+        if (first is Map<String, dynamic>) {
+          location = first;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _lojistaInfo = {
+            'user_id': sellerUserId,
+            'nome_loja': _resolveProfileName(profile),
+            'avatar_url': profile?['avatar_url'] ?? '',
+            'cidade': (location?['cidade'] as String?) ?? '',
+            'estado': (location?['estado'] as String?) ?? '',
+            'total_anuncios': _veiculos.length,
+          };
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar informações do lojista: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingLojista = false);
+      }
+    }
+  }
+
+  String _resolveProfileName(Map<String, dynamic>? profile) {
+    final raw = (profile?['nome_loja'] ?? profile?['name']) as String?;
+    if (raw == null) return 'Lojista';
+    final trimmed = raw.trim();
+    return trimmed.isEmpty ? 'Lojista' : trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final avatarUrl = (widget.lojista['avatar_url'] as String?)?.trim() ?? '';
-    final nome = (widget.lojista['nome_loja'] as String?)?.trim() ?? 'Lojista';
-    final cidade = (widget.lojista['cidade'] as String?)?.trim() ?? '';
-    final estado = (widget.lojista['estado'] as String?)?.trim() ?? '';
+    final avatarUrl = (_lojistaInfo?['avatar_url'] as String?)?.trim() ?? '';
+    final nome = (_lojistaInfo?['nome_loja'] as String?)?.trim();
+    final nomeDisplay = (nome != null && nome.isNotEmpty) ? nome : 'Lojista';
+    final cidade = (_lojistaInfo?['cidade'] as String?)?.trim() ?? '';
+    final estado = (_lojistaInfo?['estado'] as String?)?.trim() ?? '';
     final localizacao = [cidade, estado].where((part) => part.isNotEmpty).join(' - ');
     final totalAnuncios = _veiculos.length;
 
@@ -136,9 +230,14 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    nome,
+                    nomeDisplay,
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
+                  if (_loadingLojista)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
                   const SizedBox(height: 4),
                   Text(
                     localizacao.isNotEmpty ? localizacao : 'Localização indisponível',
@@ -222,6 +321,7 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
         onRefresh: () async {
           await _carregarAnuncios();
           await _checkIfFollowing();
+          await _carregarLojistaInfo();
         },
         child: CustomScrollView(
           slivers: [

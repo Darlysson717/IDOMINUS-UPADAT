@@ -57,6 +57,16 @@
 				<string>https</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>dominus</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dominus</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

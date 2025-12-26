@@ -14,6 +14,7 @@ import 'perfil_page.dart';
 import 'seller_verification_page.dart';
 import 'notifications_page.dart';
 import 'lojistas_seguidos_page.dart';
+import 'lojista_anuncios_page.dart';
 import 'sobre_dominus_page.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
@@ -45,13 +46,13 @@ void main() async {
   try {
     await NotificationService.initialize();
   } catch (e) {
-    print('Erro ao inicializar notificações: $e');
+    debugPrint('Erro ao inicializar notificações: $e');
   }
 
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
-      child: DeepLinkHandler(child: MyApp()),
+      child: DeepLinkHandler(child: const MyApp()),
     ),
   );
 }
@@ -98,11 +99,48 @@ class _DeepLinkHandlerState extends State<DeepLinkHandler> {
   }
 
   void _handleDeepLink(Uri uri) {
-    if (uri.host == 'domin.us' && uri.path.startsWith('/vehicle/')) {
-      final vehicleId = uri.pathSegments.last;
-      // Navegar para detalhes do veículo
-      DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
+    if (uri.scheme == 'dominus') {
+      if (uri.host == 'seller') {
+        final sellerId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+        if (sellerId != null && sellerId.isNotEmpty) {
+          _openSellerFromLink(sellerId);
+        }
+      }
+      return;
     }
+
+    if (uri.host != 'domin.us') return;
+
+    if (uri.path.startsWith('/vehicle/')) {
+      final vehicleId = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+      if (vehicleId != null && vehicleId.isNotEmpty) {
+        DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
+      }
+      return;
+    }
+
+    if (uri.path.startsWith('/seller/')) {
+      final sellerId = uri.pathSegments.length >= 2 ? uri.pathSegments.last : null;
+      if (sellerId != null && sellerId.isNotEmpty) {
+        _openSellerFromLink(sellerId);
+      }
+      return;
+    }
+
+    if (uri.path == '/seller_redirect.html') {
+      final sellerId = uri.queryParameters['seller'];
+      if (sellerId != null && sellerId.isNotEmpty) {
+        _openSellerFromLink(sellerId);
+      }
+    }
+  }
+
+  void _openSellerFromLink(String sellerId) {
+    DeepLinkHandler.navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => LojistaAnunciosPage(sellerId: sellerId),
+      ),
+    );
   }
 
   @override
@@ -112,8 +150,10 @@ class _DeepLinkHandlerState extends State<DeepLinkHandler> {
 }
 
 class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
   @override
-  _AuthWrapperState createState() => _AuthWrapperState();
+  State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
@@ -196,7 +236,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             }
           }
         }, onError: (error) {
-          print('❌ NOTIFICATION: Listener error: $error');
+          debugPrint('❌ NOTIFICATION: Listener error: $error');
         });
   }
 
@@ -215,35 +255,37 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      print('⏳ AuthWrapper: Carregando...');
+      debugPrint('⏳ AuthWrapper: Carregando...');
       return Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_showOnboarding) {
-      print('📖 AuthWrapper: Mostrando onboarding');
+      debugPrint('📖 AuthWrapper: Mostrando onboarding');
       return OnboardingPage(onFinish: _finishOnboarding);
     }
     if (_user == null) {
-      print('🔐 AuthWrapper: Usuário não logado, mostrando LoginPage');
+      debugPrint('🔐 AuthWrapper: Usuário não logado, mostrando LoginPage');
       return LoginPage();
     } else {
-      print('✅ AuthWrapper: Usuário logado (${_user!.id}), mostrando CompradorHome');
+      debugPrint('✅ AuthWrapper: Usuário logado (${_user!.id}), mostrando CompradorHome');
       return CompradorHome();
     }
   }
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
           title: 'Dominus',
-          navigatorKey: navigatorKey,
+          navigatorKey: DeepLinkHandler.navigatorKey,
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: themeProvider.themeMode,
-          home: AuthWrapper(),
+          home: const AuthWrapper(),
           routes: {
             '/publicar': (context) => PublicarAnuncioPage(anuncio: ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?),
             '/home': (context) => CompradorHome(),
@@ -275,11 +317,9 @@ class MyApp extends StatelessWidget {
         secondary: Color(0xFF3949AB), // Azul médio
         tertiary: Color(0xFF5E35B1), // Roxo elegante
         surface: Colors.white,
-        background: Color(0xFFFAFAFA),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: Color(0xFF1C1B1F),
-        onBackground: Color(0xFF1C1B1F),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1A237E),
@@ -333,11 +373,9 @@ class MyApp extends StatelessWidget {
         secondary: Color(0xFF5E35B1), // Roxo elegante
         tertiary: Color(0xFF7986CB), // Azul claro
         surface: Color(0xFF1C1B1F),
-        background: Color(0xFF121212),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: Colors.white,
-        onBackground: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1C1B1F),

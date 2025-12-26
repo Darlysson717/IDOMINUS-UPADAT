@@ -11,8 +11,6 @@ import 'services/recommendation_service.dart';
 import 'widgets/vehicle_carousel.dart';
 import 'widgets/skeleton_widgets.dart';
 import 'services/update_service.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:open_file/open_file.dart';
 
 String removeAccents(String str) {
   const accents = 'àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ';
@@ -1014,47 +1012,27 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
   }
 
   void _downloadFromBrowser(String apkUrl) async {
-    print('🌐 Iniciando download no navegador...');
-    print('🔗 URL do APK: $apkUrl');
+    print('🌐 Abrindo página oficial para atualização: $apkUrl');
 
     try {
-      final uri = Uri.parse(apkUrl);
-      print('🔍 URI parseada: $uri');
-      print('🔍 Scheme: ${uri.scheme}, Host: ${uri.host}, Path: ${uri.path}');
-
-      final canLaunch = await canLaunchUrl(uri);
-      print('🚀 Pode lançar URL: $canLaunch');
-
-      if (canLaunch) {
-        print('🌐 Abrindo URL no navegador...');
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        print('✅ URL aberta com sucesso');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Download iniciado no navegador. Procure o arquivo baixado e instale manualmente.'))
-          );
-        }
-      } else {
-        print('❌ Não foi possível lançar a URL');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Não foi possível abrir o navegador. Verifique se a URL está correta.'))
-          );
-        }
-      }
-    } catch (e) {
-      print('❌ Erro ao abrir navegador: $e');
+      await UpdateService.openUpdateLink(apkUrl);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao abrir navegador: $e'))
+          const SnackBar(content: Text('Abrimos a página oficial. Conclua o download por lá.')),
+        );
+      }
+    } catch (e) {
+      print('❌ Erro ao abrir página externa: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao abrir página externa: $e')),
         );
       }
     }
   }
 }
 
-class UpdateProgressDialog extends StatefulWidget {
+class UpdateProgressDialog extends StatelessWidget {
   final Map<String, dynamic> updateInfo;
   final VoidCallback onDownloadFromBrowser;
 
@@ -1065,210 +1043,78 @@ class UpdateProgressDialog extends StatefulWidget {
   });
 
   @override
-  State<UpdateProgressDialog> createState() => _UpdateProgressDialogState();
-}
-
-class _UpdateProgressDialogState extends State<UpdateProgressDialog> {
-  double _progress = 0.0;
-  late String _status;
-  bool _isDownloading = false;
-  bool _downloadComplete = false;
-  String? _filePath;
-  String? _apkUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _status = 'Versão ${widget.updateInfo['version']} está disponível. Deseja atualizar agora?';
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final changelog = updateInfo['changelog'];
     return AlertDialog(
-      title: Row(
+      title: const Row(
         children: [
-          Icon(_downloadComplete ? Icons.check_circle : Icons.system_update, 
-               color: _downloadComplete ? Colors.green : Colors.blue),
-          const SizedBox(width: 8),
-          const Text('Atualização Disponível'),
+          Icon(Icons.system_update, color: Colors.blue),
+          SizedBox(width: 8),
+          Text('Atualização Disponível'),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_status, style: const TextStyle(height: 1.4)),
-          if (widget.updateInfo['changelog'] != null) ...[
+          Text('Versão ${updateInfo['version']} está pronta. Vamos abrir a loja ou navegador para finalizar a instalação.'),
+          if (changelog != null && (changelog as String).trim().isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(
-              widget.updateInfo['changelog'],
+              changelog,
               style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
             ),
           ],
-          if (_isDownloading) ...[
-            const SizedBox(height: 16),
-            LinearProgressIndicator(value: _progress / 100),
-            const SizedBox(height: 8),
-            Text('${_progress.toStringAsFixed(1)}%', 
-                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'O Dominus não instala mais atualizações internamente. Use o botão abaixo para abrir o download oficial.',
+              style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
+            ),
+          ),
         ],
       ),
       actions: [
-        if (!_isDownloading && !_downloadComplete)
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Depois'),
-          ),
-        if (!_isDownloading && !_downloadComplete)
-          TextButton.icon(
-            onPressed: widget.onDownloadFromBrowser,
-            icon: const Icon(Icons.open_in_browser),
-            label: const Text('Baixar no Navegador'),
-          ),
-        if (!_isDownloading && !_downloadComplete)
-          ElevatedButton(
-            onPressed: _startDownload,
-            child: const Text('Atualizar Agora'),
-          ),
-        if (_downloadComplete)
-          ElevatedButton(
-            onPressed: _installApk,
-            child: const Text('Instalar'),
-          ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Depois'),
+        ),
+        TextButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop();
+            onDownloadFromBrowser();
+          },
+          icon: const Icon(Icons.open_in_browser),
+          label: const Text('Abrir no Navegador'),
+        ),
+        ElevatedButton(
+          onPressed: () => _openStore(context),
+          child: const Text('Atualizar Agora'),
+        ),
       ],
     );
   }
 
-  void _startDownload() async {
-    setState(() {
-      _isDownloading = true;
-      _status = 'Iniciando download...';
-    });
-
+  Future<void> _openStore(BuildContext context) async {
     try {
-      await UpdateService.downloadAndInstallUpdate(
-        widget.updateInfo['apkUrl'],
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() {
-              _progress = progress;
-              _status = 'Baixando atualização... ${progress.toStringAsFixed(1)}%';
-            });
-          }
-        },
-        onStatus: (status) {
-          if (mounted) {
-            setState(() {
-              _status = status;
-            });
-          }
-        },
-        onDownloadComplete: () {
-          if (mounted) {
-            setState(() {
-              _downloadComplete = true;
-              _isDownloading = false;
-            });
-          }
-        },
+      await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao abrir atualização: $e')),
       );
-    } catch (e) {
-      if (mounted) {
-        final errorMessage = e.toString();
-        if (errorMessage.contains('INSTALL_MANUAL_REQUIRED')) {
-          final parts = errorMessage.split(':');
-          _filePath = parts.length > 1 ? parts[1] : null;
-          _apkUrl = parts.length > 2 ? parts[2] : null;
-          setState(() {
-            _downloadComplete = true;
-            _isDownloading = false;
-          });
-        } else {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro na atualização: $errorMessage'))
-          );
-        }
-      }
-    }
-  }
-
-  void _installApk() async {
-    if (_filePath == null) return;
-
-    try {
-      // Tentar instalar novamente
-      final result = await OpenFile.open(_filePath!);
-      if (result.type == ResultType.done) {
-        Navigator.of(context).pop();
-        return;
-      }
-
-      // Se falhou, mostrar instruções
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Instalação Manual Necessária'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Para instalar a atualização, siga estes passos:'),
-                const SizedBox(height: 12),
-                const Text('1. Vá para Configurações > Apps > Especial app access > Instalar apps desconhecidos'),
-                const Text('2. Encontre este app e habilite a permissão'),
-                const Text('3. Volte aqui e toque em "Tentar Instalar Novamente"'),
-                const SizedBox(height: 12),
-                const Text('Ou baixe diretamente no navegador:'),
-                const SizedBox(height: 4),
-                Text(
-                  _apkUrl ?? 'Link não disponível',
-                  style: const TextStyle(fontSize: 12, color: Colors.blue),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              TextButton.icon(
-                onPressed: widget.onDownloadFromBrowser,
-                icon: const Icon(Icons.open_in_browser),
-                label: const Text('Baixar no Navegador'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  // Tentar novamente
-                  final result = await OpenFile.open(_filePath!);
-                  if (result.type != ResultType.done && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Instalação falhou. Tente baixar no navegador.'))
-                    );
-                  }
-                },
-                child: const Text('Tentar Instalar Novamente'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro na instalação: $e'))
-        );
-      }
     }
   }
 }
 
-class ForcedUpdateProgressDialog extends StatefulWidget {
+class ForcedUpdateProgressDialog extends StatelessWidget {
   final Map<String, dynamic> updateInfo;
   final VoidCallback onDownloadFromBrowser;
 
@@ -1279,19 +1125,8 @@ class ForcedUpdateProgressDialog extends StatefulWidget {
   });
 
   @override
-  State<ForcedUpdateProgressDialog> createState() => _ForcedUpdateProgressDialogState();
-}
-
-class _ForcedUpdateProgressDialogState extends State<ForcedUpdateProgressDialog> {
-  double _progress = 0.0;
-  String _status = 'Uma nova versão está disponível e deve ser instalada para continuar usando o app.';
-  bool _isDownloading = false;
-  bool _downloadComplete = false;
-  String? _filePath;
-  String? _apkUrl;
-
-  @override
   Widget build(BuildContext context) {
+    final changelog = updateInfo['changelog'];
     return AlertDialog(
       title: const Row(
         children: [
@@ -1304,213 +1139,70 @@ class _ForcedUpdateProgressDialogState extends State<ForcedUpdateProgressDialog>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_status, style: const TextStyle(height: 1.4)),
-          if (widget.updateInfo['changelog'] != null) ...[
+          const Text('Para continuar usando o Dominus você precisa atualizar pela loja oficial.'),
+          const SizedBox(height: 8),
+          Text('Versão disponível: ${updateInfo['version']}'),
+          if (changelog != null && (changelog as String).trim().isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text('Novidades:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(
-              widget.updateInfo['changelog'],
+              changelog,
               style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
             ),
           ],
-          if (_isDownloading) ...[
-            const SizedBox(height: 16),
-            LinearProgressIndicator(value: _progress / 100),
-            const SizedBox(height: 8),
-            Text('${_progress.toStringAsFixed(1)}%', 
-                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-          if (!_isDownloading && !_downloadComplete) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.red, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'O app será fechado se você não atualizar agora.',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
             ),
-          ],
+            child: const Text(
+              'O app será encerrado se você optar por não atualizar agora.',
+              style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
       actions: [
-        if (!_isDownloading && !_downloadComplete)
-          TextButton.icon(
-            onPressed: () {
-              // Fecha o app completamente
-              SystemNavigator.pop();
-            },
-            icon: const Icon(Icons.exit_to_app, color: Colors.grey),
-            label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
+        TextButton.icon(
+          onPressed: () {
+            SystemNavigator.pop();
+          },
+          icon: const Icon(Icons.exit_to_app, color: Colors.grey),
+          label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
+        ),
+        TextButton.icon(
+          onPressed: () {
+            Navigator.of(context).pop();
+            onDownloadFromBrowser();
+          },
+          icon: const Icon(Icons.open_in_browser),
+          label: const Text('Abrir no Navegador'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => _openStore(context),
+          icon: const Icon(Icons.download),
+          label: const Text('Atualizar Agora'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
           ),
-        if (!_isDownloading && !_downloadComplete)
-          TextButton.icon(
-            onPressed: widget.onDownloadFromBrowser,
-            icon: const Icon(Icons.open_in_browser),
-            label: const Text('Baixar no Navegador'),
-          ),
-        if (!_isDownloading && !_downloadComplete)
-          ElevatedButton.icon(
-            onPressed: _startDownload,
-            icon: const Icon(Icons.download),
-            label: const Text('Atualizar Agora'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
-        if (_downloadComplete)
-          ElevatedButton(
-            onPressed: _installApk,
-            child: const Text('Instalar'),
-          ),
+        ),
       ],
     );
   }
 
-  void _startDownload() async {
-    setState(() {
-      _isDownloading = true;
-      _status = 'Iniciando download da atualização obrigatória...';
-    });
-
+  Future<void> _openStore(BuildContext context) async {
     try {
-      await UpdateService.downloadAndInstallUpdate(
-        widget.updateInfo['apkUrl'],
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() {
-              _progress = progress;
-              _status = 'Baixando atualização obrigatória... ${progress.toStringAsFixed(1)}%';
-            });
-          }
-        },
-        onStatus: (status) {
-          if (mounted) {
-            setState(() {
-              _status = status;
-            });
-          }
-        },
-        onDownloadComplete: () {
-          if (mounted) {
-            setState(() {
-              _downloadComplete = true;
-              _isDownloading = false;
-            });
-          }
-        },
+      await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+      Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao abrir atualização: $e')),
       );
-    } catch (e) {
-      if (mounted) {
-        final errorMessage = e.toString();
-        if (errorMessage.contains('INSTALL_MANUAL_REQUIRED')) {
-          final parts = errorMessage.split(':');
-          _filePath = parts.length > 1 ? parts[1] : null;
-          _apkUrl = parts.length > 2 ? parts[2] : null;
-          setState(() {
-            _downloadComplete = true;
-            _isDownloading = false;
-          });
-        } else {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro na atualização: $errorMessage'))
-          );
-        }
-      }
-    }
-  }
-
-  void _installApk() async {
-    if (_filePath == null) return;
-
-    try {
-      // Tentar instalar novamente
-      final result = await OpenFile.open(_filePath!);
-      if (result.type == ResultType.done) {
-        Navigator.of(context).pop();
-        return;
-      }
-
-      // Se falhou, mostrar instruções
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Instalação Manual Necessária'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Para instalar a atualização obrigatória, siga estes passos:'),
-                const SizedBox(height: 12),
-                const Text('1. Vá para Configurações > Apps > Especial app access > Instalar apps desconhecidos'),
-                const Text('2. Encontre este app e habilite a permissão'),
-                const Text('3. Volte aqui e toque em "Tentar Instalar Novamente"'),
-                const SizedBox(height: 12),
-                const Text('Ou baixe diretamente no navegador:'),
-                const SizedBox(height: 4),
-                Text(
-                  _apkUrl ?? 'Link não disponível',
-                  style: const TextStyle(fontSize: 12, color: Colors.blue),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              TextButton.icon(
-                onPressed: widget.onDownloadFromBrowser,
-                icon: const Icon(Icons.open_in_browser),
-                label: const Text('Baixar no Navegador'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  // Tentar novamente
-                  final result = await OpenFile.open(_filePath!);
-                  if (result.type != ResultType.done && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Instalação falhou. Tente baixar no navegador.'))
-                    );
-                  }
-                },
-                child: const Text('Tentar Instalar Novamente'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro na instalação: $e'))
-        );
-      }
     }
   }
 }
