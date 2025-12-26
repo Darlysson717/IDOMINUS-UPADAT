@@ -28,7 +28,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _checkForUpdate() async {
     final updateInfo = await UpdateService.checkForUpdate();
     if (updateInfo != null) {
-      _showUpdateDialog(updateInfo);
+      final currentVersion = await UpdateService.getCurrentVersion();
+      if (UpdateService.compareVersions(currentVersion, updateInfo['version']) < 0) {
+        _showUpdateDialog(updateInfo);
+      }
     }
   }
 

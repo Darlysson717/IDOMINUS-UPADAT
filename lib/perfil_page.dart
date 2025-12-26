@@ -715,8 +715,22 @@ class PerfilPage extends StatelessWidget {
       }
 
       if (updateInfo != null) {
-        if (context.mounted) {
-          _showUpdateDialog(context, updateInfo);
+        final currentVersion = await UpdateService.getCurrentVersion();
+        final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+
+        if (comparison < 0) {
+          if (context.mounted) {
+            _showUpdateDialog(context, updateInfo);
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Você já está na versão mais recente!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         }
       } else {
         if (context.mounted) {

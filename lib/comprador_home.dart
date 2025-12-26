@@ -132,7 +132,12 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
       final updateInfo = await UpdateService.checkForUpdate();
       
       if (updateInfo != null && mounted) {
-        _showForcedUpdateDialog(updateInfo);
+        final currentVersion = await UpdateService.getCurrentVersion();
+        final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+
+        if (comparison < 0) {
+          _showForcedUpdateDialog(updateInfo);
+        }
       }
     } catch (e) {
       print('⚠️ Erro na verificação automática de atualização: $e');
