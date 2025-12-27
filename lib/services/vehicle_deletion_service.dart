@@ -25,6 +25,15 @@ class VehicleDeletionService {
       await _deleteImagesFromStorage(fotos.cast<String>());
       await _deleteImagesFromStorage(fotosThumb.cast<String>());
 
+      // Excluir visualizações relacionadas ao anúncio
+      await _client.from('visualizacoes').delete().eq('anuncio_id', vehicleId);
+
+      // Excluir visualizações diárias agregadas
+      await _client.from('visualizacoes_diarias').delete().eq('anuncio_id', vehicleId);
+
+      // Excluir favoritos relacionados ao anúncio
+      await _client.from('favoritos').delete().eq('veiculo_id', vehicleId);
+
       // Excluir registro do banco de dados
       await _client.from('veiculos').delete().eq('id', vehicleId);
 
