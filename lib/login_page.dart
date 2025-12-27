@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/update_service.dart';
@@ -26,10 +28,12 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _checkForUpdate() async {
+    if (kDebugMode) return; // Não verificar updates em debug
     final updateInfo = await UpdateService.checkForUpdate();
     if (updateInfo != null) {
       final currentVersion = await UpdateService.getCurrentVersion();
-      if (UpdateService.compareVersions(currentVersion, updateInfo['version']) < 0) {
+      final comparison = UpdateService.compareVersions(currentVersion, updateInfo['version']);
+      if (comparison < 0) {
         _showUpdateDialog(updateInfo);
       }
     }
@@ -52,6 +56,11 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => SystemNavigator.pop(),
+            icon: const Icon(Icons.exit_to_app, color: Colors.grey),
+            label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
             onPressed: () async {
               try {

@@ -44,7 +44,6 @@ class UpdateService {
   static Future<String> getCurrentVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final version = packageInfo.version;
-    print('📱 Versão atual: $version');
     return version;
   }
 

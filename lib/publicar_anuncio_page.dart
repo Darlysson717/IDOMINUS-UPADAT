@@ -147,7 +147,8 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
 
       // Fotos existentes (URLs)
       final fotosUrls = a['fotos'] as List<dynamic>? ?? [];
-      _thumbUrls.addAll(fotosUrls.map((e) => e.toString()));
+      final thumbUrls = a['fotos_thumb'] as List<dynamic>? ?? [];
+      _thumbUrls.addAll(thumbUrls.isNotEmpty ? thumbUrls.map((e) => e.toString()) : fotosUrls.map((e) => e.toString()));
     }
   }
 
@@ -279,6 +280,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
     try {
   final upload = await _uploadFotos();
   final fotosUrls = upload['orig'] ?? [];
+  final thumbUrls = upload['thumb'] ?? [];
   // Normalização de cidade (Title Case) e UF maiúscula
   String cidadeRaw = _cidade.text.trim();
   String cidadeNorm = cidadeRaw.split(RegExp(r'\s+')).map((p){
@@ -287,7 +289,6 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
     return lower[0].toUpperCase()+lower.substring(1);
   }).join(' ');
   final ufNorm = _ufSelecionado?.toUpperCase();
-  // thumbnails ignoradas pois coluna fotos_thumb não existe no schema atual
   final anuncio = <String,dynamic>{
         'titulo': _titulo.text.trim(),
         'descricao': _descricao.text.trim(),
@@ -329,6 +330,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
         'manual_chave': _manualChave,
         'ipva_pago': _ipvaPago,
   if (fotosUrls.isNotEmpty) 'fotos': fotosUrls,
+  if (thumbUrls.isNotEmpty) 'fotos_thumb': thumbUrls,
         'criado_em': DateTime.now().toIso8601String(),
         'user_id': user.id,
   'status': widget.anuncio?['status'] ?? 'ativo',

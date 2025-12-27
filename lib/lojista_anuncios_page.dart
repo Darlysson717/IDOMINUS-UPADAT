@@ -375,12 +375,15 @@ class _LojistaAnunciosPageState extends State<LojistaAnunciosPage> {
 
   Map<String, String> _extractVehicleData(Map<String, dynamic> veiculo) {
     final foto = (() {
+      // Tentar usar fotos_thumb se existir
       final thumbs = veiculo['fotos_thumb'];
       if (thumbs is List && thumbs.isNotEmpty && thumbs.first is String) {
         return thumbs.first as String;
       }
+      // Fallback para foto única
       final primeiraFoto = veiculo['foto'];
       if (primeiraFoto is String && primeiraFoto.isNotEmpty) return primeiraFoto;
+      // Fallback para primeira foto do array
       final fotos = veiculo['fotos'];
       if (fotos is List && fotos.isNotEmpty && fotos.first is String) {
         return fotos.first as String;

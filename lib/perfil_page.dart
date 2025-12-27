@@ -28,8 +28,65 @@ import 'services/profile_service.dart';
 import 'lojista_anuncios_page.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
-class PerfilPage extends StatelessWidget {
+class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
+
+  @override
+  State<PerfilPage> createState() => _PerfilPageState();
+}
+
+class _PerfilPageState extends State<PerfilPage> {
+  String? _userId;
+  late Future<Map<String, int>> _statsFuture;
+  RealtimeChannel? _followersChannel;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = Supabase.instance.client.auth.currentUser;
+    _userId = user?.id;
+
+    if (user != null) {
+      ProfileService().syncProfileFromAuth();
+      _statsFuture = _loadUserStats(user.id);
+      _followersChannel = Supabase.instance.client
+          .channel('seller-followers-${user.id}')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'vendedores_seguidos',
+          callback: (payload) {
+            final newVendedor = payload.newRecord.isNotEmpty ? payload.newRecord['vendedor_id'] : null;
+            final oldVendedor = payload.oldRecord.isNotEmpty ? payload.oldRecord['vendedor_id'] : null;
+            debugPrint('[PerfilPage] Evento realtime recebido: new=$newVendedor old=$oldVendedor para vendedor=${user.id}');
+            if (newVendedor == user.id || oldVendedor == user.id) {
+              _refreshStats();
+            }
+          },
+        )
+        ..subscribe();
+    } else {
+      _statsFuture = Future.value(const {
+        'anuncios': 0,
+        'visualizacoes': 0,
+        'seguidores': 0,
+      });
+    }
+  }
+
+  void _refreshStats() {
+    if (!mounted || _userId == null) return;
+    debugPrint('[PerfilPage] Atualizando estatísticas para usuário $_userId');
+    setState(() {
+      _statsFuture = _loadUserStats(_userId!);
+    });
+  }
+
+  @override
+  void dispose() {
+    _followersChannel?.unsubscribe();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,12 +95,7 @@ class PerfilPage extends StatelessWidget {
     final email = user?.email ?? '';
     final fotoUrl = user?.userMetadata?['avatar_url'] ?? '';
     final isSmall = MediaQuery.of(context).size.width < 400;
-    final userId = user?.id;
-
-    // Sincronizar perfil com metadados do auth
-    if (user != null) {
-      ProfileService().syncProfileFromAuth();
-    }
+    final userId = _userId;
 
     final quickActionCards = <Widget>[
       _PerfilQuickActionCard(
@@ -335,7 +387,7 @@ class PerfilPage extends StatelessWidget {
                     ),
                     if (userId != null)
                       FutureBuilder<Map<String, int>>(
-                        future: _loadUserStats(userId),
+                        future: _statsFuture,
                         builder: (context, snapshot) {
                           final stats = snapshot.data ?? const {'anuncios': 0, 'visualizacoes': 0, 'seguidores': 0};
                           final loading = snapshot.connectionState == ConnectionState.waiting;
@@ -781,6 +833,11 @@ class PerfilPage extends StatelessWidget {
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => SystemNavigator.pop(),
+            icon: const Icon(Icons.exit_to_app, color: Colors.grey),
+            label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
             onPressed: () async {
               try {
@@ -920,8 +977,10 @@ Future<Map<String, int>> _loadUserStats(String userId) async {
   final client = Supabase.instance.client;
 
   try {
+    debugPrint('[PerfilPage] _loadUserStats iniciada para $userId');
     // Mesmo cálculo da tela de Visualizações (AnalyticsService) para total de visualizações
     final summary = await AnalyticsService.I.fetchSummary(days: 90);
+    debugPrint('[PerfilPage] Total de visualizações últimos 90 dias: ${summary.totalViews}');
 
     // Mesma contagem usada em MeusAnunciosPage: lista anúncios do usuário
     final anunciosResponse = await client
@@ -935,18 +994,24 @@ Future<Map<String, int>> _loadUserStats(String userId) async {
     } catch (_) {
       anunciosCount = 0;
     }
+    debugPrint('[PerfilPage] Total de anúncios carregados: $anunciosCount');
 
     final seguidoresResponse = await client
         .from('vendedores_seguidos')
         .select('id')
         .eq('vendedor_id', userId);
 
+    final seguidoresCount = (seguidoresResponse as List).length;
+    debugPrint('[PerfilPage] Total de seguidores retornado pelo banco: $seguidoresCount');
+
     return {
       'anuncios': anunciosCount,
       'visualizacoes': summary.totalViews,
-      'seguidores': (seguidoresResponse as List).length,
+      'seguidores': seguidoresCount,
     };
-  } catch (_) {
+  } catch (error, stack) {
+    debugPrint('[PerfilPage] Erro ao carregar estatísticas: $error');
+    debugPrint('[PerfilPage] Stack: $stack');
     return const {'anuncios': 0, 'visualizacoes': 0, 'seguidores': 0};
   }
 }
