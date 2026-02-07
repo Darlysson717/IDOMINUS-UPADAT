@@ -10,6 +10,7 @@ class AdsStatisticsPage extends StatefulWidget {
 }
 
 class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
+  final BusinessAdsService _adsService = BusinessAdsService();
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _userAds = [];
   bool _isLoading = true;
@@ -22,8 +23,10 @@ class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
 
   Future<void> _loadStatistics() async {
     try {
-      final stats = await BusinessAdsService().getAdsStats();
-      var userAds = await BusinessAdsService().getUserAds();
+      await _adsService.cleanupExpiredAds();
+
+      final stats = await _adsService.getAdsStats();
+      var userAds = await _adsService.getUserAds();
 
       // Se não encontrou anúncios para o usuário atual, tentar buscar todos (debug)
       if (userAds.isEmpty) {
@@ -74,7 +77,7 @@ class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
 
   Future<void> _fixAdsUserId() async {
     try {
-      await BusinessAdsService().fixAdsUserId();
+      await _adsService.fixAdsUserId();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ User ID dos anúncios corrigido! Recarregando dados...'),
@@ -91,6 +94,64 @@ class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _deleteAd(String adId) async {
+    try {
+      print('🗑️ Iniciando exclusão do anúncio: $adId');
+      await _adsService.deleteBusinessAd(adId);
+      print('✅ Anúncio deletado com sucesso do serviço');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Anúncio deletado com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Forçar recarregamento completo dos dados
+      print('🔄 Recarregando dados após exclusão...');
+      await _loadStatistics();
+      print('✅ Dados recarregados após exclusão');
+
+    } catch (e) {
+      print('❌ Erro ao deletar anúncio: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erro ao deletar anúncio: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDeleteConfirmation(String adId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: const Text(
+          'Tem certeza que deseja excluir este anúncio? Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAd(adId);
     }
   }
 
@@ -338,7 +399,7 @@ class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Se você tem anúncios criados, clique no botão\n"🔧 Corrigir User ID dos Anúncios" acima',
+                  'Se você já possui anúncios, confira se está autenticado com a conta correta ou recarregue a tela.',
                   style: TextStyle(
                     color: Colors.grey,
                     fontSize: 14,
@@ -363,114 +424,201 @@ class _AdsStatisticsPageState extends State<AdsStatisticsPage> {
           ),
         ),
         const SizedBox(height: 16),
-        ..._userAds.map((ad) => Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        ad['business_name'] ?? 'Nome não informado',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+        ..._userAds.map((ad) {
+          final imageUrl = (ad['image_url'] ?? '').toString();
+          final hasImage = imageUrl.isNotEmpty;
+
+          return Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ad['business_name'] ?? 'Nome não informado',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getPlanColor(ad['plan_type']).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _getPlanName(ad['plan_type']),
-                        style: TextStyle(
-                          color: _getPlanColor(ad['plan_type']),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getPlanColor(ad['plan_type']).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _getPlanName(ad['plan_type']),
+                          style: TextStyle(
+                            color: _getPlanColor(ad['plan_type']),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (ad['category'] != null)
-                  Text(
-                    ad['category'],
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
+                    ],
                   ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.visibility,
-                      size: 16,
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(width: 4),
+                  if (hasImage) ...[
+                    const SizedBox(height: 12),
+                    _buildAdImage(imageUrl),
+                  ],
+                  const SizedBox(height: 8),
+                  if (ad['category'] != null)
                     Text(
-                      '${ad['views_count'] ?? 0} visualizações',
-                      style: const TextStyle(
-                        fontSize: 12,
+                      ad['category'],
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.visibility,
+                        size: 16,
                         color: Colors.blue,
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      Icons.touch_app,
-                      size: 16,
-                      color: Colors.green,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${ad['clicks_count'] ?? 0} cliques',
-                      style: const TextStyle(
-                        fontSize: 12,
+                      const SizedBox(width: 4),
+                      Text(
+                        '${ad['views_count'] ?? 0} visualizações',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(
+                        Icons.touch_app,
+                        size: 16,
                         color: Colors.green,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      ad['is_active'] == true ? Icons.check_circle : Icons.pause_circle,
-                      size: 16,
-                      color: ad['is_active'] == true ? Colors.green : Colors.orange,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      ad['is_active'] == true ? 'Ativo' : 'Inativo',
-                      style: TextStyle(
-                        fontSize: 12,
+                      const SizedBox(width: 4),
+                      Text(
+                        '${ad['clicks_count'] ?? 0} cliques',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        ad['is_active'] == true ? Icons.check_circle : Icons.pause_circle,
+                        size: 16,
                         color: ad['is_active'] == true ? Colors.green : Colors.orange,
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      _formatDate(ad['created_at']),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
+                      const SizedBox(width: 4),
+                      Text(
+                        ad['is_active'] == true ? 'Ativo' : 'Inativo',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ad['is_active'] == true ? Colors.green : Colors.orange,
+                        ),
                       ),
+                      const Spacer(),
+                      Text(
+                        _formatDate(ad['created_at']),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (ad['expires_at'] != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: Colors.redAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Expira em ${_formatDate(ad['expires_at'])} (será removido automaticamente)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.redAccent[200],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _showDeleteConfirmation(ad['id']),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.red,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Excluir',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        )),
+          );
+        }),
       ],
+    );
+  }
+
+  Widget _buildAdImage(String url) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: Icon(
+                  Icons.broken_image,
+                  color: Colors.grey,
+                  size: 32,
+                ),
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          },
+        ),
+      ),
     );
   }
 

@@ -252,6 +252,8 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
                       const SizedBox(height: 16),
                       _PriceHeader(titulo: titulo, preco: preco, pagamentos: pagamentos),
                       const SizedBox(height: 16),
+                      const _SafetyWarningNotice(),
+                      const SizedBox(height: 16),
                       _ActionButtons(
                         favorito: isFavorito,
                         onToggleFavorito: () async {
@@ -550,47 +552,229 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+class _SafetyWarningNotice extends StatelessWidget {
+  const _SafetyWarningNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 28),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Atenção: faça a vistoria pessoalmente',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Não realize transferências ou pagamentos antes de visitar a loja, conferir a documentação e ver o veículo de perto.',
+                  style: TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PriceHeader extends StatelessWidget {
   final String titulo; final String preco; final List<String> pagamentos;
   const _PriceHeader({required this.titulo, required this.preco, required this.pagamentos});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            Color.lerp(theme.colorScheme.primary, theme.colorScheme.primaryContainer, 0.55)!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      padding: const EdgeInsets.fromLTRB(18,16,18,18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height:10),
-          Text(preco, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: Colors.white)),
-          const SizedBox(height:12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: pagamentos.map((p)=> Container(
-              padding: const EdgeInsets.symmetric(horizontal:10, vertical:6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.15),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white24),
+    final hasPagamentos = pagamentos.isNotEmpty;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 360;
+        final stackPriceMeta = constraints.maxWidth < 420;
+
+        Widget buildTitleTexts({bool expand = false}) {
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                titulo,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              child: Text(p, style: const TextStyle(color: Colors.white, fontSize: 12,fontWeight: FontWeight.w500)),
-            )).toList(),
-          )
-        ],
-      ),
+              const SizedBox(height: 2),
+              const Text(
+                'Preço informado pelo lojista',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
+          );
+          if (expand) {
+            return Expanded(child: content);
+          }
+          return content;
+        }
+
+        final iconCircle = Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black.withOpacity(.15),
+          ),
+          child: const Icon(Icons.local_offer, color: Colors.white, size: 24),
+        );
+
+        final ctaButton = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(.15),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'Ver na loja',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+        );
+
+        final metaTexts = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('Confirme presencialmente antes de negociar', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        );
+
+        Widget header;
+        if (isCompact) {
+          header = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  iconCircle,
+                  const SizedBox(width: 12),
+                  Expanded(child: buildTitleTexts()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ctaButton,
+              ),
+            ],
+          );
+        } else {
+          header = Row(
+            children: [
+              iconCircle,
+              const SizedBox(width: 12),
+              buildTitleTexts(expand: true),
+              const SizedBox(width: 12),
+              ctaButton,
+            ],
+          );
+        }
+
+        Widget priceBlock;
+        if (stackPriceMeta) {
+          priceBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(preco, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white)),
+              const SizedBox(height: 8),
+              metaTexts,
+            ],
+          );
+        } else {
+          priceBlock = Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                flex: 0,
+                child: Text(preco, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: metaTexts),
+            ],
+          );
+        }
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary,
+                Color.lerp(theme.colorScheme.primary, theme.colorScheme.primaryContainer, 0.55)!,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          padding: const EdgeInsets.fromLTRB(18,16,18,18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              header,
+              const SizedBox(height: 14),
+              priceBlock,
+              if (hasPagamentos) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.payments_outlined, color: Colors.white, size: 18),
+                      SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Formas de pagamento aceitas',
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: pagamentos.map((p)=> Container(
+                    padding: const EdgeInsets.symmetric(horizontal:10, vertical:6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Text(p, style: const TextStyle(color: Colors.white, fontSize: 12,fontWeight: FontWeight.w600)),
+                  )).toList(),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

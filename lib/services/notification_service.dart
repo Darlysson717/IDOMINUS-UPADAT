@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart';
 // import 'package:workmanager/workmanager.dart'; // Removido temporariamente
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,6 +8,8 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
+    if (kIsWeb) return; // Notificações locais não funcionam na web
+
     // Configurar notificações locais
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -30,6 +33,8 @@ class NotificationService {
     required String body,
     int id = 0,
   }) async {
+    if (kIsWeb) return; // Notificações locais não funcionam na web
+
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       'channel_id',

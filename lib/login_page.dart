@@ -89,11 +89,25 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      // Para web, usar redirect dinâmico baseado na URL atual
+      String? redirectTo;
+      if (kIsWeb) {
+        // Na web, redirecionar para a origem atual (sem query params)
+        final uri = Uri.base;
+        redirectTo = '${uri.scheme}://${uri.host}:${uri.port}/';
+      } else {
+        redirectTo = 'io.supabase.flutter://callback';
+      }
+
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'io.supabase.flutter://callback',
+        redirectTo: redirectTo,
       );
-      _startSessionPolling();
+      
+      // Na web, não precisamos de polling pois o redirect atualiza a página
+      if (!kIsWeb) {
+        _startSessionPolling();
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Falha ao iniciar autenticação com Google: ${e.toString()}';

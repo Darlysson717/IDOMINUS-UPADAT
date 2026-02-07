@@ -91,14 +91,15 @@ class AdminService {
       final currentUser = Supabase.instance.client.auth.currentUser;
       if (currentUser == null) return false;
 
-      // Buscar user_id do email
-      final userResponse = await _supabase
-          .from('auth.users')
-          .select('id')
-          .eq('email', email.toLowerCase())
-          .single();
+      // Buscar user_id do email usando função RPC
+      final userId = await _supabase.rpc('get_user_id_by_email', params: {
+        'user_email': email.toLowerCase(),
+      });
 
-      final userId = userResponse['id'];
+      if (userId == null) {
+        print('Usuário não encontrado com o email: $email');
+        return false;
+      }
 
       await _supabase.from('administrators').insert({
         'email': email.toLowerCase(),
@@ -125,6 +126,27 @@ class AdminService {
     } catch (e) {
       print('Erro ao remover administrador: $e');
       return false;
+    }
+  }
+
+  static Future<int> getTotalUsersCount() async {
+    try {
+      // Usa função RPC para contar usuários autenticados
+      final response = await _supabase.rpc('get_total_auth_users');
+
+      return response as int;
+    } catch (e) {
+      print('Erro ao contar usuários via RPC: $e');
+      // Fallback: conta da tabela profiles
+      try {
+        final fallbackResponse = await _supabase
+            .from('profiles')
+            .select('id');
+        return fallbackResponse.length;
+      } catch (fallbackError) {
+        print('Erro no fallback também: $fallbackError');
+        return 0;
+      }
     }
   }
 }

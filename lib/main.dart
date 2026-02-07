@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'publicar_anuncio_page.dart';
 import 'comprador_home.dart';
@@ -16,6 +17,7 @@ import 'notifications_page.dart';
 import 'lojistas_seguidos_page.dart';
 import 'lojista_anuncios_page.dart';
 import 'sobre_dominus_page.dart';
+import 'ads_statistics_page.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -262,6 +264,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
       debugPrint('📖 AuthWrapper: Mostrando onboarding');
       return OnboardingPage(onFinish: _finishOnboarding);
     }
+    
+    // Para web, mostrar tela principal diretamente para teste
+    if (kIsWeb) {
+      debugPrint('🌐 Modo web: pulando login, mostrando CompradorHome');
+      return CompradorHome();
+    }
+    
     if (_user == null) {
       debugPrint('🔐 AuthWrapper: Usuário não logado, mostrando LoginPage');
       return LoginPage();
@@ -301,6 +310,7 @@ class MyApp extends StatelessWidget {
             '/notifications': (context) => const NotificationsPage(),
             '/lojistas': (context) => const LojistasSeguidosPage(),
             '/sobre-dominus': (context) => const SobreDominusPage(),
+            '/ads-statistics': (context) => const AdsStatisticsPage(),
           },
         );
       },

@@ -13,6 +13,8 @@ import 'services/recommendation_service.dart';
 import 'widgets/vehicle_carousel.dart';
 import 'widgets/skeleton_widgets.dart';
 import 'services/update_service.dart';
+import 'services/business_ads_service.dart';
+import 'widgets/business_ad_card.dart';
 
 String removeAccents(String str) {
   const accents = 'àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ';
@@ -41,6 +43,9 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
   List<Map<String, dynamic>> _veiculos = [];
   bool _loading = true;
   late final RealtimeChannel _realtimeChannel;
+
+  // Anúncios de negócio
+  List<Map<String, dynamic>> _businessAds = [];
 
   // Novos serviços para carrosséis
   final RecommendationService _recommendationService = RecommendationService.I;
@@ -81,6 +86,16 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
             _buscarVeiculos();
           },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'business_ads',
+          callback: (payload) {
+            print('📡 Mudança detectada em business_ads: ${payload.eventType}');
+            // Recarregar anúncios de negócio quando houver qualquer mudança
+            _loadBusinessAds();
+          },
+        )
         .subscribe();
     
     // Configurar verificação periódica de atualizações (a cada 24 horas)
@@ -112,9 +127,12 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
     if (state == AppLifecycleState.resumed) {
       final now = DateTime.now();
       if (_lastUpdateCheck == null || now.difference(_lastUpdateCheck!).inHours >= 1) {
-        print('📱 App voltou ao foreground - verificando atualizações...');
+        print('📱 App voltou ao foreground - verificando atualizações e recarregando anúncios...');
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) _checkForUpdate();
+          if (mounted) {
+            _checkForUpdate();
+            _loadBusinessAds(); // Recarregar anúncios de negócio
+          }
         });
       }
     }
@@ -337,6 +355,8 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
           _veiculos = veiculos;
           _loading = false;
         });
+        // Carregar anúncios de negócio após carregar veículos
+        await _loadBusinessAds();
       }
     } on PostgrestException catch (error) {
       if (aplicarStatus && error.code == '42703') {
@@ -362,6 +382,27 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
           _veiculos = [];
           _loading = false;
           _erroSnack = 'Erro ao carregar veículos: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadBusinessAds() async {
+    if (!mounted) return;
+
+    try {
+      final businessAdsService = BusinessAdsService();
+      final ads = await businessAdsService.getAllActiveAds();
+
+      if (mounted) {
+        setState(() {
+          _businessAds = ads;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _businessAds = [];
         });
       }
     }
@@ -482,6 +523,52 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
       }
       return busca && filtro && marcaOk && modeloOk && anoMinOk && anoMaxOk && precoMinOk && precoMaxOk && kmMinOk && kmMaxOk && corOk && combustivelOk && cambioOk && motorizacaoOk && numPortasOk && condicaoOk && carroceriaOk && direcaoOk && faroisOk && situacaoVeiculoOk && localCidadeOk;
     }).toList();
+
+    // Criar lista mista de veículos e anúncios de negócio
+    final List<Map<String, dynamic>> mixedItems = [];
+
+    // Filtrar anúncios de negócio por busca (apenas por nome do negócio e categoria)
+    final businessAdsFiltrados = _businessAds.where((ad) {
+      if (_searchText.isEmpty) return true;
+      final businessName = (ad['business_name'] ?? '').toLowerCase();
+      final category = (ad['category'] ?? '').toLowerCase();
+      final creativeText = (ad['creative_text'] ?? '').toLowerCase();
+      return businessName.contains(_searchText.toLowerCase()) ||
+             category.contains(_searchText.toLowerCase()) ||
+             creativeText.contains(_searchText.toLowerCase());
+    }).toList();
+
+    // Filtrar anúncios por cidade se houver filtro de localização
+    final businessAdsComCidade = businessAdsFiltrados.where((ad) {
+      if (_cidadeFiltro.isEmpty) return true;
+      final adCity = (ad['city'] ?? '').toLowerCase();
+      return removeAccents(adCity).contains(removeAccents(_cidadeFiltro.toLowerCase()));
+    }).toList();
+
+    // Intercalar veículos e anúncios (a cada 3 veículos, inserir 1 anúncio)
+    int vehicleIndex = 0;
+    int adIndex = 0;
+    const int adsInterval = 3; // Inserir 1 anúncio a cada 3 veículos
+
+    while (vehicleIndex < veiculosFiltrados.length || adIndex < businessAdsComCidade.length) {
+      // Adicionar veículos em grupos
+      for (int i = 0; i < adsInterval && vehicleIndex < veiculosFiltrados.length; i++) {
+        mixedItems.add({
+          'type': 'vehicle',
+          'data': veiculosFiltrados[vehicleIndex],
+        });
+        vehicleIndex++;
+      }
+
+      // Adicionar anúncio se disponível
+      if (adIndex < businessAdsComCidade.length) {
+        mixedItems.add({
+          'type': 'business_ad',
+          'data': businessAdsComCidade[adIndex],
+        });
+        adIndex++;
+      }
+    }
 
     final bool shouldShowRecommendationsCarousel =
       _loadingRecommended || _hasLoadedRecommendations;
@@ -749,7 +836,7 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                         ),
                       ),
                     ),
-                    if (veiculosFiltrados.isEmpty)
+                    if (mixedItems.isEmpty)
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: Padding(
@@ -761,7 +848,7 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                               Icon(Icons.directions_car_filled_outlined, size: 48, color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.4) : primaryColor.withValues(alpha: 0.4)),
                               const SizedBox(height: 12),
                               Text(
-                                'Nenhum veículo encontrado com os filtros atuais.',
+                                'Nenhum veículo ou anúncio encontrado com os filtros atuais.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: primaryColor.withValues(alpha: 0.6),
@@ -795,9 +882,9 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                           delegate: (() {
                             final bool showRecommendationsCarousel = shouldShowRecommendationsCarousel;
                             final int carouselInsertIndex = showRecommendationsCarousel
-                                ? (veiculosFiltrados.length >= 5 ? 5 : veiculosFiltrados.length)
+                                ? (mixedItems.length >= 5 ? 5 : mixedItems.length)
                                 : -1;
-                            final int totalItems = veiculosFiltrados.length + (showRecommendationsCarousel ? 1 : 0);
+                            final int totalItems = mixedItems.length + (showRecommendationsCarousel ? 1 : 0);
 
                             return SliverChildBuilderDelegate(
                               (context, index) {
@@ -821,7 +908,24 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                                     ? index - 1
                                     : index;
 
-                                final veiculo = veiculosFiltrados[adjustedIndex];
+                                if (adjustedIndex >= mixedItems.length) return const SizedBox.shrink();
+
+                                final item = mixedItems[adjustedIndex];
+                                final itemType = item['type'];
+                                final itemData = item['data'];
+
+                                if (itemType == 'business_ad') {
+                                  // Renderizar anúncio de negócio com layout diferente
+                                  return Padding(
+                                    padding: EdgeInsets.only(bottom: bottomSpacing),
+                                    child: BusinessAdCard(
+                                      ad: itemData,
+                                      showStats: false,
+                                    ),
+                                  );
+                                } else {
+                                  // Renderizar veículo (lógica existente)
+                                  final veiculo = itemData;
                                 // Normalização e proteção contra nulls / tipos inesperados
                               final String foto = (() {
                                 final thumbs = veiculo['fotos_thumb'];
@@ -918,6 +1022,7 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                                   },
                                 ),
                               );
+                                }
                               },
                               childCount: totalItems,
                             );

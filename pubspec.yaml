@@ -48,6 +48,7 @@ dependencies:
   csv: ^6.0.0
   share_plus: ^10.0.0
   qr_flutter: ^4.1.0
+  http: ^1.1.0
   pdf: ^3.11.0
   url_launcher: ^6.3.0
   app_links: ^6.4.1
@@ -70,6 +71,13 @@ dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  efipay: ^1.0.6
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/Dominuspremiun.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

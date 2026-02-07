@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import '../services/vehicle_deletion_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/business_ads_service.dart';
 
 class AdminVerificationPanel extends StatefulWidget {
   const AdminVerificationPanel({super.key});
@@ -21,13 +22,15 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
   bool _isLoading = true;
   bool _isAdmin = false;
   bool _isSuperAdmin = false;
+  bool _isCleaningExpiredAds = false;
   String? _errorMessage;
   late TabController _tabController;
+  int _totalUsers = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _initializeAdminStatus();
   }
 
@@ -60,6 +63,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
       _loadVerifications(),
       _loadAdministrators(),
       _checkSuperAdminStatus(),
+      _loadUserStats(),
     ]);
   }
 
@@ -96,6 +100,17 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
     setState(() {
       _isSuperAdmin = isSuperAdmin;
     });
+  }
+
+  Future<void> _loadUserStats() async {
+    try {
+      final totalUsers = await AdminService.getTotalUsersCount();
+      setState(() {
+        _totalUsers = totalUsers;
+      });
+    } catch (e) {
+      print('Erro ao carregar estatísticas de usuários: $e');
+    }
   }
 
   Future<void> _approveVerification(String userId) async {
@@ -736,15 +751,12 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
               text: 'Manutenção',
               icon: Icon(Icons.build, color: Colors.white),
             ),
+            Tab(
+              text: 'Estatísticas',
+              icon: Icon(Icons.bar_chart, color: Colors.white),
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _loadData,
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Atualizar',
-          ),
-        ],
       ),
       body: TabBarView(
         controller: _tabController,
@@ -752,6 +764,7 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
           _buildVerificationsTab(),
           _buildAdministratorsTab(),
           _buildMaintenanceTab(),
+          _buildStatisticsTab(),
         ],
       ),
     );
@@ -1006,6 +1019,52 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
+                  'Remover anúncios expirados',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Executa manualmente a limpeza dos anúncios comerciais com mais de 30 dias '
+                  'e remove as imagens correspondentes do storage.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isCleaningExpiredAds ? null : _cleanupExpiredBusinessAds,
+                    icon: _isCleaningExpiredAds
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.delete_forever),
+                    label: Text(_isCleaningExpiredAds ? 'Limpando anúncios...' : 'Excluir anúncios expirados'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
                   'Limpeza de Imagens Órfãs',
                   style: TextStyle(
                     fontSize: 16,
@@ -1080,6 +1139,66 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
     );
   }
 
+  Future<void> _cleanupExpiredBusinessAds() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remover anúncios expirados'),
+        content: const Text(
+          'Confirma executar a limpeza manual dos anúncios comerciais que já passaram dos 30 dias? '
+          'Todas as imagens vinculadas também serão apagadas.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Executar', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    setState(() {
+      _isCleaningExpiredAds = true;
+    });
+
+    try {
+      final service = BusinessAdsService();
+      await service.cleanupExpiredAds();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Limpeza de anúncios expirados concluída.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao remover anúncios expirados: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCleaningExpiredAds = false;
+        });
+      }
+    }
+  }
+
   Future<void> _cleanupOrphanedImages() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -1125,6 +1244,68 @@ class _AdminVerificationPanelState extends State<AdminVerificationPanel> with Si
         }
       }
     }
+  }
+
+  Widget _buildStatisticsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Estatísticas do Sistema',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.people, size: 32, color: Colors.blue),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Total de Usuários Autenticados',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '$_totalUsers usuários',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _loadUserStats,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Atualizar Estatísticas'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> _getSystemStats() async {

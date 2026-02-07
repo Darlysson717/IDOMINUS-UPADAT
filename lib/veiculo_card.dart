@@ -62,7 +62,7 @@ class VeiculoCard extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     final isSmall = size.width < 400;
     final cardRadius = isSmall ? 12.0 : 18.0;
-    final imageHeight = isSmall ? 210.0 : 320.0;
+    final imageHeight = isSmall ? 280.0 : 390.0;
     final padding = isSmall ? 12.0 : 16.0;
 
     return SizedBox(
@@ -87,7 +87,7 @@ class VeiculoCard extends StatelessWidget {
                           height: imageHeight,
                           width: double.infinity,
                           color: Colors.grey[300],
-                          child: Icon(Icons.directions_car, size: 60, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
+                          child: Icon(Icons.directions_car, size: 70, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
                         )
                       : Hero(
                           tag: foto,
@@ -101,7 +101,7 @@ class VeiculoCard extends StatelessWidget {
                                 height: imageHeight,
                                 width: double.infinity,
                                 color: Colors.grey[300],
-                                child: Icon(Icons.directions_car, size: 60, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
+                                child: Icon(Icons.directions_car, size: 70, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
                               );
                             },
                           ),
@@ -126,7 +126,7 @@ class VeiculoCard extends StatelessWidget {
                     nome,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: isSmall ? 16 : 22,
+                      fontSize: isSmall ? 18 : 24,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -138,7 +138,7 @@ class VeiculoCard extends StatelessWidget {
                     style: TextStyle(
                       color: Colors.deepPurple,
                       fontWeight: FontWeight.bold,
-                      fontSize: isSmall ? 15 : 20,
+                      fontSize: isSmall ? 17 : 22,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -198,7 +198,7 @@ class VeiculoCard extends StatelessWidget {
                         child: Text(
                           'Ver',
                           style: TextStyle(
-                            fontSize: isSmall ? 14 : 16,
+                            fontSize: isSmall ? 15 : 17,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
@@ -233,13 +233,13 @@ class _DetailInfo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: isSmall ? 14 : 16, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
+        Icon(icon, size: isSmall ? 15 : 17, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.grey[600]),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: isSmall ? 12 : 13,
+              fontSize: isSmall ? 13 : 14,
               color: Colors.grey[700],
               fontWeight: FontWeight.w500,
             ),

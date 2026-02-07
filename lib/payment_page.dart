@@ -1,9 +1,13 @@
+import 'package:efipay/efipay.dart';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'config/payment_config.dart';
 import 'services/business_ads_service.dart';
+import 'services/pix_payment_service.dart';
 
 class PaymentPage extends StatefulWidget {
   final String selectedPlan;
@@ -22,8 +26,8 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  String? _pixCode;
-  String? _qrCodeData;
+  PixPaymentResult? _pixPayment;
+  String? _pixError;
   bool _isLoading = false;
   bool _paymentCompleted = false;
 
@@ -36,15 +40,35 @@ class _PaymentPageState extends State<PaymentPage> {
   Future<void> _generatePixPayment() async {
     setState(() {
       _isLoading = true;
+      _pixError = null;
     });
 
     try {
-      // Simular geração de PIX (em produção, isso seria uma chamada para seu backend)
-      final pixData = await _createPixPayment();
+      final amountInCents = _getAmountFromPlan();
+      final payerEmail = Supabase.instance.client.auth.currentUser?.email ??
+          widget.adData['userEmail']?.toString();
+
+      final metadata = <String, dynamic>{
+        'business_name': widget.adData['businessName'],
+        'category': widget.adData['category'],
+        'city': widget.adData['city'],
+        'plan_type': widget.selectedPlan,
+      }..removeWhere(
+          (key, value) => value == null || (value is String && value.isEmpty),
+        );
+
+      final pixResult = await PixPaymentService.instance.createPixPayment(
+        amountInCents: amountInCents,
+        planType: widget.selectedPlan,
+        description: _getPlanDescription(),
+        metadata: metadata,
+        payerEmail: (payerEmail != null && payerEmail.isNotEmpty)
+            ? payerEmail
+            : PaymentConfig.fallbackPayerEmail,
+      );
 
       setState(() {
-        _pixCode = pixData['pix_code'];
-        _qrCodeData = pixData['qr_code'];
+        _pixPayment = pixResult;
         _isLoading = false;
       });
     } catch (e) {
@@ -56,68 +80,11 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
         );
         setState(() {
+          _pixError = e.toString();
           _isLoading = false;
         });
       }
     }
-  }
-
-  Future<Map<String, dynamic>> _createPixPayment() async {
-    // Esta é uma simulação - você precisará implementar um backend real
-    // que gere o código PIX através de uma API PIX (como do seu banco)
-
-    final amount = _getAmountFromPlan();
-    final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Dados do recebedor (substitua pelos seus dados reais)
-    const merchantName = 'Dominus Marketplace';
-    const merchantCity = 'Sao Paulo';
-    const pixKey = 'seu-pix-key@dominio.com'; // Substitua pela sua chave PIX
-
-    // Gerar código PIX simplificado (formato EMV)
-    final pixCode = _generatePixCode(
-      pixKey: pixKey,
-      merchantName: merchantName,
-      merchantCity: merchantCity,
-      amount: amount / 100.0, // Converter centavos para reais
-      transactionId: transactionId,
-    );
-
-    return {
-      'pix_code': pixCode,
-      'qr_code': pixCode,
-      'transaction_id': transactionId,
-      'amount': amount,
-    };
-  }
-
-  String _generatePixCode({
-    required String pixKey,
-    required String merchantName,
-    required String merchantCity,
-    required double amount,
-    required String transactionId,
-  }) {
-    // Implementação simplificada do código PIX EMV
-    // Em produção, use uma biblioteca específica ou API do banco
-
-    final amountStr = amount.toStringAsFixed(2).replaceAll('.', '');
-
-    // Formato básico do PIX
-    return '000201'
-        '010211' // Payload Format Indicator
-        '2683' // Merchant Account Information (PIX)
-        '0014BR.GOV.BCB.PIX' // GUI
-        '0112${pixKey.length.toString().padLeft(2, '0')}$pixKey' // Chave PIX
-        '0216${merchantCity.length.toString().padLeft(2, '0')}$merchantCity' // Cidade do recebedor
-        '52040000' // Merchant Category Code
-        '5303986' // Moeda (BRL)
-        '540${amountStr.length.toString().padLeft(2, '0')}$amountStr' // Valor
-        '5802BR' // País
-        '59${merchantName.length.toString().padLeft(2, '0')}$merchantName' // Nome do recebedor
-        '6002${merchantCity.length.toString().padLeft(2, '0')}$merchantCity' // Cidade do recebedor
-        '62${transactionId.length.toString().padLeft(2, '0')}$transactionId' // Additional Data Field
-        '6304'; // CRC (simplificado)
   }
 
   int _getAmountFromPlan() {
@@ -140,13 +107,28 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  String _formatExpiration(DateTime expiresAt) {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    final local = expiresAt.toLocal();
+    return '${twoDigits(local.day)}/${twoDigits(local.month)}/${local.year} '
+        '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
+  }
+
   void _copyPixCode() {
-    if (_pixCode != null) {
-      Clipboard.setData(ClipboardData(text: _pixCode!));
+    final copyPasteKey = _pixPayment?.copyPasteKey;
+    if (copyPasteKey != null && copyPasteKey.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: copyPasteKey));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Código PIX copiado para a área de transferência'),
           backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhum código PIX disponível para copiar'),
+          backgroundColor: Colors.orange,
         ),
       );
     }
@@ -330,7 +312,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   ],
                 ),
               )
-            else if (_qrCodeData != null)
+            else if (_pixPayment?.qrCode.isNotEmpty ?? false)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -344,7 +326,7 @@ class _PaymentPageState extends State<PaymentPage> {
                           border: Border.all(color: Colors.grey.shade200),
                         ),
                         child: QrImageView(
-                          data: _qrCodeData!,
+                          data: _pixPayment!.qrCode,
                           version: QrVersions.auto,
                           size: 200.0,
                         ),
@@ -367,6 +349,41 @@ class _PaymentPageState extends State<PaymentPage> {
                           backgroundColor: Colors.grey.shade200,
                           foregroundColor: Colors.black,
                         ),
+                      ),
+                      if (_pixPayment?.expiresAt != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Expira em: ${_formatExpiration(_pixPayment!.expiresAt!)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'ID do pagamento: ${_pixPayment?.paymentId ?? '---'}',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(Icons.qr_code_2_outlined, size: 64, color: Colors.grey.shade500),
+                      const SizedBox(height: 12),
+                      Text(
+                        _pixError ?? 'Não foi possível gerar o QR Code PIX. Tente novamente.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _generatePixPayment,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
                       ),
                     ],
                   ),

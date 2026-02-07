@@ -24,6 +24,7 @@ import 'services/update_service.dart';
 import 'admin_verification_panel.dart';
 import 'models/seller_verification.dart';
 import 'services/analytics_service.dart';
+import 'business_ads_page.dart';
 import 'services/profile_service.dart';
 import 'lojista_anuncios_page.dart';
 
@@ -145,6 +146,25 @@ class _PerfilPageState extends State<PerfilPage> {
         ),
       );
     }
+
+    // Novo card: Ganhe alcance com o Dominus
+    quickActionCards.add(
+      _PerfilPremiumActionCard(
+        icon: Icons.trending_up,
+        label: 'Ganhe alcance com o Dominus',
+        subtitle: 'Anuncie seu negócio',
+        gradient: const LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BusinessAdsPage()),
+          );
+        },
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -628,7 +648,7 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  String _buildSellerShareLink(String userId) => 'https://domin.us/seller_redirect.html?seller=$userId';
+  String _buildSellerShareLink(String userId) => 'dominus://seller/$userId';
 
   Future<void> _exportSellerQrAsPdf(
     BuildContext context, {
@@ -1013,6 +1033,136 @@ Future<Map<String, int>> _loadUserStats(String userId) async {
     debugPrint('[PerfilPage] Erro ao carregar estatísticas: $error');
     debugPrint('[PerfilPage] Stack: $stack');
     return const {'anuncios': 0, 'visualizacoes': 0, 'seguidores': 0};
+  }
+}
+
+/// Card de ação premium para o perfil
+class _PerfilPremiumActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final LinearGradient gradient;
+  final VoidCallback onTap;
+
+  const _PerfilPremiumActionCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 400;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          width: isSmall ? 100 : 110,
+          height: isSmall ? 100 : 110,
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: gradient.colors.first.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Padrão de fundo sutil
+              Positioned(
+                top: -20,
+                right: -20,
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              // Conteúdo principal
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Ícone com fundo branco sutil
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: isSmall ? 24 : 28,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Texto principal
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: isSmall ? 11 : 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    // Subtítulo
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: isSmall ? 9 : 10,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Badge "NOVO" ou "PREMIUM"
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'NOVO',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

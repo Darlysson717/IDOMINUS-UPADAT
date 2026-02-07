@@ -6,12 +6,14 @@ class BusinessAdCard extends StatefulWidget {
   final Map<String, dynamic> ad;
   final bool showStats;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   const BusinessAdCard({
     super.key,
     required this.ad,
     this.showStats = false,
     this.onTap,
+    this.onDelete,
   });
 
   @override
@@ -233,14 +235,33 @@ class _BusinessAdCardState extends State<BusinessAdCard> {
                 ),
                 const SizedBox(height: 12),
                 if (widget.ad['business_name'] != null) ...[
-                  Text(
-                    widget.ad['business_name'],
-                    style: TextStyle(
-                      fontSize: isPremium ? 22 : isDestaque ? 20 : 18,
-                      fontWeight: isPremium ? FontWeight.w900 : isDestaque ? FontWeight.w700 : FontWeight.bold,
-                      color: isPremium ? Colors.purple.shade800 : isDestaque ? Colors.orange.shade800 : null,
-                      letterSpacing: isPremium ? 0.5 : isDestaque ? 0.3 : null,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.ad['business_name'],
+                          style: TextStyle(
+                            fontSize: isPremium ? 22 : isDestaque ? 20 : 18,
+                            fontWeight: isPremium ? FontWeight.w900 : isDestaque ? FontWeight.w700 : FontWeight.bold,
+                            color: isPremium ? Colors.purple.shade800 : isDestaque ? Colors.orange.shade800 : null,
+                            letterSpacing: isPremium ? 0.5 : isDestaque ? 0.3 : null,
+                          ),
+                        ),
+                      ),
+                      if (widget.onDelete != null) ...[
+                        IconButton(
+                          onPressed: widget.onDelete,
+                          icon: const Icon(
+                            Icons.delete,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          tooltip: 'Excluir anúncio',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                 ],

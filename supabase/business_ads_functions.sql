@@ -127,3 +127,38 @@ BEGIN
     LIMIT 1;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Função para deletar anúncio de negócio (com verificação de ownership)
+-- Primeiro dropar a função existente se ela existir
+DROP FUNCTION IF EXISTS delete_business_ad(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION delete_business_ad(
+    ad_id UUID,
+    p_user_id UUID
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    ad_record RECORD;
+BEGIN
+    -- Verificar se o anúncio existe e pertence ao usuário
+    SELECT * INTO ad_record
+    FROM business_ads
+    WHERE id = ad_id AND user_id = p_user_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Anúncio não encontrado ou você não tem permissão para excluí-lo';
+    END IF;
+
+    -- Deletar o anúncio do banco (a imagem será deletada pelo código Dart)
+    DELETE FROM business_ads
+    WHERE id = ad_id AND user_id = p_user_id;
+
+    -- Verificar se foi realmente deletado
+    IF NOT EXISTS (SELECT 1 FROM business_ads WHERE id = ad_id) THEN
+        RETURN TRUE;
+    ELSE
+        RETURN FALSE;
+    END IF;
+
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

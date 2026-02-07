@@ -47,6 +47,64 @@ class _MyBusinessAdsPageState extends State<MyBusinessAdsPage> {
     }
   }
 
+  Future<void> _deleteAd(String adId) async {
+    try {
+      print('🗑️ Iniciando exclusão do anúncio: $adId');
+      await BusinessAdsService().deleteBusinessAd(adId);
+      print('✅ Anúncio deletado com sucesso do serviço');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Anúncio deletado com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Forçar recarregamento completo dos dados
+      print('🔄 Recarregando dados após exclusão...');
+      await _loadUserAds();
+      print('✅ Dados recarregados após exclusão');
+
+    } catch (e) {
+      print('❌ Erro ao deletar anúncio: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erro ao deletar anúncio: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDeleteConfirmation(String adId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: const Text(
+          'Tem certeza que deseja excluir este anúncio? Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAd(adId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,6 +188,7 @@ class _MyBusinessAdsPageState extends State<MyBusinessAdsPage> {
           ad: ad,
           showStats: true,
           onTap: () => _showAdDetails(ad),
+          onDelete: () => _showDeleteConfirmation(ad['id']),
         )),
 
         const SizedBox(height: 16),

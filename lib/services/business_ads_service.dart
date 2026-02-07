@@ -220,4 +220,101 @@ class BusinessAdsService {
 
     print('✅ fixAdsUserId: ${response.length} anúncios corrigidos');
   }
+
+  // Deletar anúncio específico
+  Future<void> deleteBusinessAd(String adId) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('Usuário não autenticado');
+
+    print('🗑️ Deletando anúncio ID: $adId com user_id: $userId');
+
+    // Primeiro, buscar o anúncio para obter a URL da imagem
+    print('🔍 Buscando anúncio para obter URL da imagem...');
+    Map<String, dynamic>? adResponse;
+    try {
+      adResponse = await _supabase
+          .from('business_ads')
+          .select('image_url')
+          .eq('id', adId)
+          .eq('user_id', userId)
+          .single();
+      print('🔍 Anúncio encontrado: ${adResponse != null}');
+    } catch (e) {
+      print('⚠️ Erro ao buscar anúncio (pode não ter imagem): $e');
+      // Se não conseguir buscar, continua sem imagem
+    }
+
+    final imageUrl = adResponse?['image_url'];
+
+    // Se há imagem, deletar do storage
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        // Extrair o path do storage da URL
+        final uri = Uri.parse(imageUrl);
+        final pathSegments = uri.pathSegments;
+        final storagePath = pathSegments.sublist(pathSegments.indexOf('fotos') + 1).join('/');
+
+        await _supabase.storage.from('fotos').remove([storagePath]);
+        print('🖼️ Imagem deletada do storage: $storagePath');
+      } catch (e) {
+        print('⚠️ Erro ao deletar imagem do storage: $e');
+        // Não falhar a operação se não conseguir deletar a imagem
+      }
+    } else {
+      print('ℹ️ Anúncio não possui imagem para deletar');
+    }
+
+    // Usar função RPC para deletar o anúncio (verifica ownership e deleta registro)
+    print('🗑️ Chamando função RPC delete_business_ad...');
+    try {
+      final result = await _supabase.rpc('delete_business_ad', params: {
+        'ad_id': adId,
+        'p_user_id': userId,
+      });
+
+      print('🗑️ Resultado da função RPC: $result');
+
+      if (result == true) {
+        print('✅ Anúncio deletado com sucesso via RPC');
+      } else {
+        print('⚠️ Função RPC retornou false');
+        throw Exception('Falha ao deletar anúncio do banco de dados');
+      }
+
+    } catch (e) {
+      print('❌ Erro na função RPC: $e');
+      throw Exception('Erro ao deletar anúncio: $e');
+    }
+  }
+
+  // Limpar anúncios expirados
+  Future<void> cleanupExpiredAds() async {
+    try {
+      print('🧹 Iniciando limpeza de anúncios expirados...');
+
+      // Buscar anúncios expirados (mais de 30 dias)
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+
+      final expiredAds = await _supabase
+          .from('business_ads')
+          .select('id, user_id, image_url')
+          .lt('created_at', thirtyDaysAgo.toIso8601String());
+
+      print('📊 Encontrados ${expiredAds.length} anúncios expirados');
+
+      for (final ad in expiredAds) {
+        try {
+          await deleteBusinessAd(ad['id']);
+          print('✅ Anúncio expirado deletado: ${ad['id']}');
+        } catch (e) {
+          print('❌ Erro ao deletar anúncio expirado ${ad['id']}: $e');
+        }
+      }
+
+      print('🧹 Limpeza de anúncios expirados concluída');
+    } catch (e) {
+      print('❌ Erro na limpeza de anúncios expirados: $e');
+      throw Exception('Erro ao limpar anúncios expirados: $e');
+    }
+  }
 }
