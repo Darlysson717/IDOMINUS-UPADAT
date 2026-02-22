@@ -92,9 +92,14 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
   final List<String> _thumbUrls = [];
   bool _publicando = false;
 
+  // Verificação do vendedor
+  SellerVerification? _verification;
+  bool _verificationLoaded = false;
+
   @override
   void initState() {
     super.initState();
+    _loadVerification();
 
     // Pre-fill fields if editing
     if (widget.anuncio != null) {
@@ -158,6 +163,20 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
   _titulo,_descricao,_preco,_modelo,_versao,_anoFab,_km,_cidade,_cor,_airbags,_garantia
     ]) { c.dispose(); }
     super.dispose();
+  }
+
+  Future<void> _loadVerification() async {
+    try {
+      _verification = await SellerVerificationService().getCurrentUserVerification();
+    } catch (e) {
+      // Handle error if needed
+    } finally {
+      if (mounted) {
+        setState(() {
+          _verificationLoaded = true;
+        });
+      }
+    }
   }
 
   // -------- Utilidades de parsing --------
@@ -439,26 +458,21 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<SellerVerification?>(
-      future: SellerVerificationService().getCurrentUserVerification(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    if (!_verificationLoaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-        final verification = snapshot.data;
+    final verification = _verification;
 
-        // Se não está aprovado, mostra tela de verificação necessária
-        if (verification?.status != VerificationStatus.approved) {
-          return _buildVerificationRequiredView(verification);
-        }
+    // Se não está aprovado, mostra tela de verificação necessária
+    if (verification?.status != VerificationStatus.approved) {
+      return _buildVerificationRequiredView(verification);
+    }
 
-        // Se aprovado, mostra o formulário normal
-        return _buildPublishForm();
-      },
-    );
+    // Se aprovado, mostra o formulário normal
+    return _buildPublishForm();
   }
 
   Widget _buildVerificationRequiredView(SellerVerification? verification) {
