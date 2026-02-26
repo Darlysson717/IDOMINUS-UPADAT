@@ -77,6 +77,8 @@ dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
+  web:
+    generate: true
   image_path: "assets/images/Dominuspremiun.png"
 
 # For information on the generic Dart part of this file, see the
