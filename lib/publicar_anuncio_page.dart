@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -219,6 +220,108 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
     return _parsePrecoValor(v);
   }
 
+  String _stripDiacritics(String input) {
+    const withDiacritics = 'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ';
+    const withoutDiacritics = 'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN';
+    final buffer = StringBuffer();
+    for (final rune in input.runes) {
+      final ch = String.fromCharCode(rune);
+      final index = withDiacritics.indexOf(ch);
+      buffer.write(index == -1 ? ch : withoutDiacritics[index]);
+    }
+    return buffer.toString();
+  }
+
+  String _normalizeCity(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '';
+    final lowered = trimmed.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final key = _stripDiacritics(lowered);
+
+    const canonicalCapitals = <String, String>{
+      'aracaju': 'Aracaju',
+      'belem': 'Belém',
+      'belo horizonte': 'Belo Horizonte',
+      'boa vista': 'Boa Vista',
+      'brasilia': 'Brasília',
+      'campo grande': 'Campo Grande',
+      'cuiaba': 'Cuiabá',
+      'curitiba': 'Curitiba',
+      'florianopolis': 'Florianópolis',
+      'fortaleza': 'Fortaleza',
+      'goiania': 'Goiânia',
+      'joao pessoa': 'João Pessoa',
+      'macapa': 'Macapá',
+      'maceio': 'Maceió',
+      'manaus': 'Manaus',
+      'natal': 'Natal',
+      'palmas': 'Palmas',
+      'porto alegre': 'Porto Alegre',
+      'porto velho': 'Porto Velho',
+      'recife': 'Recife',
+      'rio branco': 'Rio Branco',
+      'rio de janeiro': 'Rio de Janeiro',
+      'salvador': 'Salvador',
+      'sao luis': 'São Luís',
+      'sao paulo': 'São Paulo',
+      'teresina': 'Teresina',
+      'vitoria': 'Vitória',
+    };
+
+    final canonical = canonicalCapitals[key];
+    if (canonical != null) return canonical;
+
+    const lowercaseWords = {'de', 'da', 'do', 'das', 'dos', 'e'};
+    final words = lowered.split(' ');
+    final normalized = words.map((word) {
+      if (word.isEmpty) return '';
+      if (lowercaseWords.contains(word)) return word;
+      final first = word[0].toUpperCase();
+      final rest = word.length > 1 ? word.substring(1) : '';
+      return first + rest;
+    }).join(' ');
+    return normalized;
+  }
+
+  String _normalizeUf(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '';
+    final upper = trimmed.toUpperCase();
+    if (_ufs.contains(upper)) return upper;
+
+    final key = _stripDiacritics(trimmed.toLowerCase());
+    const stateToUf = <String, String>{
+      'acre': 'AC',
+      'alagoas': 'AL',
+      'amapa': 'AP',
+      'amazonas': 'AM',
+      'bahia': 'BA',
+      'ceara': 'CE',
+      'distrito federal': 'DF',
+      'espirito santo': 'ES',
+      'goias': 'GO',
+      'maranhao': 'MA',
+      'mato grosso': 'MT',
+      'mato grosso do sul': 'MS',
+      'minas gerais': 'MG',
+      'para': 'PA',
+      'paraiba': 'PB',
+      'parana': 'PR',
+      'pernambuco': 'PE',
+      'piaui': 'PI',
+      'rio de janeiro': 'RJ',
+      'rio grande do norte': 'RN',
+      'rio grande do sul': 'RS',
+      'rondonia': 'RO',
+      'roraima': 'RR',
+      'santa catarina': 'SC',
+      'sao paulo': 'SP',
+      'sergipe': 'SE',
+      'tocantins': 'TO',
+    };
+    return stateToUf[key] ?? upper;
+  }
+
   final _priceFormatter = _PriceFormatter();
   // _simNao removido: agora usamos boolean nativo direto no insert
 
@@ -300,14 +403,14 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
   final upload = await _uploadFotos();
   final fotosUrls = upload['orig'] ?? [];
   final thumbUrls = upload['thumb'] ?? [];
-  // Normalização de cidade (Title Case) e UF maiúscula
-  String cidadeRaw = _cidade.text.trim();
-  String cidadeNorm = cidadeRaw.split(RegExp(r'\s+')).map((p){
-    if(p.isEmpty) return '';
-    final lower = p.toLowerCase();
-    return lower[0].toUpperCase()+lower.substring(1);
-  }).join(' ');
-  final ufNorm = _ufSelecionado?.toUpperCase();
+  final cidadeNorm = _normalizeCity(_cidade.text);
+  final ufNorm = _normalizeUf(_ufSelecionado ?? '');
+  if (cidadeNorm.isNotEmpty) {
+    _cidade.text = cidadeNorm;
+  }
+  if (ufNorm.isNotEmpty) {
+    _ufSelecionado = ufNorm;
+  }
   final anuncio = <String,dynamic>{
         'titulo': _titulo.text.trim(),
         'descricao': _descricao.text.trim(),
@@ -577,17 +680,20 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
 
   Widget _buildPublishForm() {
     final loc = LocationService.I;
+    final allowAutoFetch = !kIsWeb;
     // Trigger fetch if not already attempted
-    if (loc.cidade == null && !loc.loading) {
+    if (allowAutoFetch && loc.cidade == null && !loc.loading) {
       // chama async após build
       Future.microtask(()=> loc.fetch());
     }
     // Se localização disponível, preenche campos
-    if (loc.cidade != null && _cidade.text.isEmpty) {
-      _cidade.text = loc.cidade!;
+    final cidadeAuto = loc.cidade;
+    if (_cidade.text.isEmpty && cidadeAuto != null && cidadeAuto.isNotEmpty) {
+      _cidade.text = cidadeAuto;
     }
-    if (loc.uf != null && _ufSelecionado == null) {
-      _ufSelecionado = loc.uf!;
+    final ufAuto = loc.uf;
+    if (_ufSelecionado == null && ufAuto != null && ufAuto.isNotEmpty) {
+      _ufSelecionado = ufAuto;
     }
     return Scaffold(
       appBar: AppBar(
@@ -698,7 +804,7 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                   items: _ufs.map((u)=>DropdownMenuItem(value:u, child: Text(u))).toList(),
                   onChanged: (val)=> setState(()=> _ufSelecionado = val),
                   validator: (v){ if(v==null || v.isEmpty) return 'UF'; return null; },
-                  disabledHint: _ufSelecionado==null? null : Text(_ufSelecionado!),
+                  disabledHint: _ufSelecionado == null ? null : Text(_ufSelecionado ?? ''),
                   isDense: true,
                 ),
               ]),
@@ -714,20 +820,25 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                     }
                     // Solicita permissão explícita
                     final ok = await LocationService.I.requestPermissionWithRationale();
-                    if(!ok){
-                      if(mounted && LocationService.I.erro != null){
+                    if (!ok) {
+                      final erro = LocationService.I.erro;
+                      if (mounted && erro != null && erro.isNotEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(LocationService.I.erro!))
+                          SnackBar(content: Text(erro))
                         );
                       }
                       return;
                     }
                     await LocationService.I.fetch(force: true);
-                    if(mounted){
-                      if(LocationService.I.cidade != null){
+                    if (mounted) {
+                      final cidadeDetectada = LocationService.I.cidade;
+                      final ufDetectada = LocationService.I.uf;
+                      if (cidadeDetectada != null && cidadeDetectada.isNotEmpty) {
                         setState(() {
-                          if(_cidade.text.isEmpty) _cidade.text = LocationService.I.cidade!;
-                          if(_ufSelecionado == null) _ufSelecionado = LocationService.I.uf;
+                          if (_cidade.text.isEmpty) _cidade.text = cidadeDetectada;
+                          if (_ufSelecionado == null && ufDetectada != null && ufDetectada.isNotEmpty) {
+                            _ufSelecionado = ufDetectada;
+                          }
                         });
                       }
                     }
@@ -762,13 +873,18 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                   padding: const EdgeInsets.only(top:4.0),
                   child: Text('Precisamos só da localização enquanto você usa esta tela para sugerir cidade automaticamente.', style: TextStyle(fontSize:11,color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54)),
                 ),
-              if(loc.cidade != null) Padding(
+              if (loc.cidade != null && loc.cidade!.isNotEmpty) Padding(
                 padding: const EdgeInsets.only(top:6.0),
                 child: Row(
                   children: [
                     Icon(Icons.location_on, size:14, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple),
                     const SizedBox(width:4),
-                    Flexible(child: Text('Local detectado: '+loc.cidade! + (loc.uf!=null? ' - '+loc.uf! : ''), style: const TextStyle(fontSize:12,color: Colors.deepPurple)))
+                    Flexible(
+                      child: Text(
+                        'Local detectado: ${loc.cidade}${loc.uf != null && loc.uf!.isNotEmpty ? ' - ${loc.uf}' : ''}',
+                        style: const TextStyle(fontSize: 12, color: Colors.deepPurple),
+                      ),
+                    )
                   ],
                 ),
               ),
@@ -778,9 +894,9 @@ class _PublicarAnuncioPageState extends State<PublicarAnuncioPage> {
                 padding: EdgeInsets.only(top:8.0),
                 child: Row(children:[SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)), SizedBox(width:8), Text('Detectando localização...')]),
               ),
-              if (loc.erro != null) Padding(
+              if (loc.erro != null && loc.erro!.isNotEmpty) Padding(
                 padding: const EdgeInsets.only(top:8.0),
-                child: Text(loc.erro!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                child: Text(loc.erro ?? '', style: const TextStyle(color: Colors.red, fontSize: 12)),
               ),
               const SizedBox(height:12),
               TextFormField(

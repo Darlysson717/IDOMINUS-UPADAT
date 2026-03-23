@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
 import 'config/payment_config.dart';
 import 'services/business_ads_service.dart';
 import 'services/pix_payment_service.dart';
@@ -139,22 +138,10 @@ class _PaymentPageState extends State<PaymentPage> {
       String? imageUrl;
 
       // Fazer upload da imagem se existir
-      if (widget.adData['image'] != null && (widget.adData['image'] is XFile || widget.adData['image'] is File)) {
+      if (widget.adData['image'] != null && widget.adData['image'] is XFile) {
         final businessAdsService = BusinessAdsService();
-
-        // Converter File para XFile se necessário
-        XFile? imageFile;
-        if (widget.adData['image'] is File) {
-          // Para File, criar um XFile temporário
-          final file = widget.adData['image'] as File;
-          imageFile = XFile(file.path, name: file.path.split('/').last);
-        } else if (widget.adData['image'] is XFile) {
-          imageFile = widget.adData['image'] as XFile;
-        }
-
-        if (imageFile != null) {
-          imageUrl = await businessAdsService.uploadBusinessAdImage(imageFile);
-        }
+        final imageFile = widget.adData['image'] as XFile;
+        imageUrl = await businessAdsService.uploadBusinessAdImage(imageFile);
       }
 
       // Salvar anúncio no banco de dados

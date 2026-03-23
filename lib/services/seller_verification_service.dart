@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/seller_verification.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'admin_service.dart';
 
 class SellerVerificationService {
@@ -106,7 +108,11 @@ class SellerVerificationService {
   }
 
   // Upload de documento (Alvará de Funcionamento) - MODO DESENVOLVIMENTO
-  Future<String> uploadDocumento(String filePath, String fileName) async {
+  Future<String> uploadDocumento(
+    String filePath,
+    String fileName, {
+    Uint8List? bytes,
+  }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('Usuário não autenticado');
 
@@ -116,12 +122,14 @@ class SellerVerificationService {
 
     // MODO DESENVOLVIMENTO: Converter imagem para base64
     try {
-      final file = File(filePath);
-      final bytes = await file.readAsBytes();
-      final base64Image = base64Encode(bytes);
+      final fileBytes = kIsWeb ? bytes : await File(filePath).readAsBytes();
+      if (fileBytes == null) {
+        throw Exception('Falha ao ler bytes do documento');
+      }
+      final base64Image = base64Encode(fileBytes);
       final mimeType = _getMimeType(fileName);
 
-      print('File size: ${bytes.length} bytes');
+      print('File size: ${fileBytes.length} bytes');
       print('MIME type: $mimeType');
       print('Base64 length: ${base64Image.length}');
 

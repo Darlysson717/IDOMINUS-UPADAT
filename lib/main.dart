@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'publicar_anuncio_page.dart';
 import 'comprador_home.dart';
@@ -30,6 +31,9 @@ import 'services/presence_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Forçar orientação retrato
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   // Inicializar Supabase primeiro
   await Supabase.initialize(
     url: 'https://xwusadbehasobjzkqsgk.supabase.co',
@@ -50,6 +54,7 @@ void main() async {
   } catch (e) {
     debugPrint('Erro ao inicializar notificações: $e');
   }
+
 
   runApp(
     ChangeNotifierProvider(
@@ -108,31 +113,48 @@ class _DeepLinkHandlerState extends State<DeepLinkHandler> {
           _openSellerFromLink(sellerId);
         }
       }
+      if (uri.host == 'vehicle') {
+        final vehicleId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+        if (vehicleId != null && vehicleId.isNotEmpty) {
+          DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
+        }
+      }
       return;
     }
 
-    if (uri.host != 'domin.us') return;
+    const allowedHosts = {'domin.us', 'darlysson717.github.io'};
+    if (!allowedHosts.contains(uri.host)) return;
 
-    if (uri.path.startsWith('/vehicle/')) {
-      final vehicleId = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    final normalizedPath = uri.path.startsWith('/DOMINUSWEB')
+        ? uri.path.substring('/DOMINUSWEB'.length)
+        : uri.path;
+    if (normalizedPath.startsWith('/vehicle/')) {
+      final vehicleId = normalizedPath.split('/').last;
       if (vehicleId != null && vehicleId.isNotEmpty) {
         DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
       }
       return;
     }
 
-    if (uri.path.startsWith('/seller/')) {
-      final sellerId = uri.pathSegments.length >= 2 ? uri.pathSegments.last : null;
+    if (normalizedPath.startsWith('/seller/')) {
+      final sellerId = normalizedPath.split('/').last;
       if (sellerId != null && sellerId.isNotEmpty) {
         _openSellerFromLink(sellerId);
       }
       return;
     }
 
-    if (uri.path == '/seller_redirect.html') {
+    if (normalizedPath == '/seller_redirect.html') {
       final sellerId = uri.queryParameters['seller'];
       if (sellerId != null && sellerId.isNotEmpty) {
         _openSellerFromLink(sellerId);
+      }
+    }
+
+    if (normalizedPath == '/vehicle_redirect.html') {
+      final vehicleId = uri.queryParameters['vehicle'];
+      if (vehicleId != null && vehicleId.isNotEmpty) {
+        DeepLinkHandler.navigatorKey.currentState?.pushNamed('/vehicle', arguments: {'id': vehicleId});
       }
     }
   }
@@ -177,8 +199,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isLoading = false;
       });
       if (_user != null) {
+        _persistNotificationUserId(_user!.id);
         _startNotificationListener();
       } else {
+        _persistNotificationUserId(null);
         _stopNotificationListener();
       }
     });
@@ -189,7 +213,17 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _user = current;
         _isLoading = false;
       });
+      _persistNotificationUserId(current.id);
       _startNotificationListener();
+    }
+  }
+
+  Future<void> _persistNotificationUserId(String? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (userId == null) {
+      await prefs.remove('notif_user_id');
+    } else {
+      await prefs.setString('notif_user_id', userId);
     }
   }
 
@@ -265,12 +299,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       return OnboardingPage(onFinish: _finishOnboarding);
     }
     
-    // Para web, mostrar tela principal diretamente para teste
-    if (kIsWeb) {
-      debugPrint('🌐 Modo web: pulando login, mostrando CompradorHome');
-      return CompradorHome();
-    }
-    
     if (_user == null) {
       debugPrint('🔐 AuthWrapper: Usuário não logado, mostrando LoginPage');
       return LoginPage();
@@ -284,6 +312,32 @@ class _AuthWrapperState extends State<AuthWrapper> {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    final name = settings.name;
+    if (name == null || name.isEmpty) return null;
+
+    final uri = Uri.parse(name);
+    if (uri.pathSegments.isEmpty) return null;
+
+    final first = uri.pathSegments.first;
+    if (first == 'vehicle' && uri.pathSegments.length >= 2) {
+      final vehicleId = uri.pathSegments[1];
+      return MaterialPageRoute(
+        builder: (_) => const DetalhesVeiculoPage(),
+        settings: RouteSettings(arguments: {'id': vehicleId}),
+      );
+    }
+
+    if (first == 'seller' && uri.pathSegments.length >= 2) {
+      final sellerId = uri.pathSegments[1];
+      return MaterialPageRoute(
+        builder: (_) => LojistaAnunciosPage(sellerId: sellerId),
+      );
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
@@ -294,6 +348,7 @@ class MyApp extends StatelessWidget {
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: themeProvider.themeMode,
+          onGenerateRoute: _onGenerateRoute,
           home: const AuthWrapper(),
           routes: {
             '/publicar': (context) => PublicarAnuncioPage(anuncio: ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?),
@@ -335,6 +390,7 @@ class MyApp extends StatelessWidget {
         backgroundColor: Color(0xFF1A237E),
         foregroundColor: Colors.white,
         elevation: 2,
+        centerTitle: false,
       ),
       cardTheme: CardThemeData(
         elevation: 4,
@@ -391,6 +447,7 @@ class MyApp extends StatelessWidget {
         backgroundColor: Color(0xFF1C1B1F),
         foregroundColor: Colors.white,
         elevation: 2,
+        centerTitle: false,
       ),
       cardTheme: CardThemeData(
         elevation: 4,

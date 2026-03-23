@@ -3,11 +3,14 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'favorites_service.dart';
 import 'services/analytics_service.dart';
 import 'services/profile_service.dart';
 import 'services/follow_service.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 class DetalhesVeiculoPage extends StatefulWidget {
@@ -23,6 +26,8 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
   Map<String, dynamic> veiculo = {};
   bool _isFollowing = false;
   bool _loadingFollow = false;
+  bool _loadingVeiculo = false;
+  bool _loadedFromApi = false;
   Map<String, dynamic>? _sellerProfile;
 
   @override
@@ -42,6 +47,43 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _logVisualizacao());
     _checkIfFollowing();
     _loadSellerProfile();
+    _loadVeiculoIfNeeded();
+  }
+
+  bool _hasVehicleDetails() {
+    return (veiculo['titulo'] ?? '').toString().trim().isNotEmpty ||
+        (veiculo['marca'] ?? '').toString().trim().isNotEmpty ||
+        (veiculo['modelo'] ?? '').toString().trim().isNotEmpty;
+  }
+
+  Future<void> _loadVeiculoIfNeeded() async {
+    if (_loadedFromApi || veiculoId.isEmpty || _hasVehicleDetails()) return;
+    _loadedFromApi = true;
+    if (mounted) setState(() => _loadingVeiculo = true);
+
+    try {
+      final data = await Supabase.instance.client
+          .from('veiculos')
+          .select()
+          .eq('id', veiculoId)
+          .maybeSingle();
+
+      if (data != null && data is Map<String, dynamic>) {
+        if (mounted) {
+          setState(() => veiculo = data);
+        }
+        _checkIfFollowing();
+        _loadSellerProfile();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar anúncio: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingVeiculo = false);
+    }
   }
 
   void _logVisualizacao() {
@@ -71,6 +113,37 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
     
     // Formatar como UUID: 8-4-4-4-12
     return '${hashStr.substring(0, 8)}-${hashStr.substring(8, 12)}-${hashStr.substring(12, 16)}-${hashStr.substring(16, 20)}-${hashStr.substring(20, 32)}';
+  }
+
+  String _guessImageExtension(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.pathSegments.isEmpty) return '.jpg';
+    final last = uri.pathSegments.last;
+    final dot = last.lastIndexOf('.');
+    if (dot == -1 || dot == last.length - 1) return '.jpg';
+    return last.substring(dot);
+  }
+
+  Uri _buildVehicleShareLink(String vehicleId) {
+    final base = Uri.https(
+      'darlysson717.github.io',
+      '/DOMINUSWEB/vehicle_redirect.html',
+      {'vehicle': vehicleId},
+    );
+    return base.replace(fragment: 'vehicle=$vehicleId');
+  }
+
+  Future<File> _downloadShareImage(String imageUrl) async {
+    final response = await http.get(Uri.parse(imageUrl));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Falha ao baixar imagem: ${response.statusCode}');
+    }
+    final directory = await getTemporaryDirectory();
+    final extension = _guessImageExtension(imageUrl);
+    final fileName = 'anuncio_${DateTime.now().millisecondsSinceEpoch}$extension';
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(response.bodyBytes, flush: true);
+    return file;
   }
 
   Future<void> _toggleFollow() async {
@@ -138,6 +211,11 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
 
   @override
   Widget build(BuildContext context) {
+  if (_loadingVeiculo && !_hasVehicleDetails()) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
   final isFavorito = _fav.isFavorited(veiculoId);
 
     List<String> fotos = [];
@@ -281,6 +359,14 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
                           final whatsapp = veiculo['whatsapp']?.toString();
                           
                           if (whatsapp != null && whatsapp.isNotEmpty) {
+                            final fotos = <String>[];
+                            if (veiculo['fotos'] is List) {
+                              fotos.addAll(List<String>.from(veiculo['fotos'].whereType<String>()));
+                            }
+                            if (fotos.isEmpty && veiculo['fotos_thumb'] is List) {
+                              fotos.addAll(List<String>.from(veiculo['fotos_thumb'].whereType<String>()));
+                            }
+
                             // Remove caracteres não numéricos
                             final cleanNumber = whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
                             
@@ -289,7 +375,24 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
                               ? cleanNumber 
                               : '55$cleanNumber';
                             
-                            final whatsappUrl = 'https://wa.me/$formattedNumber';
+                            final anuncioTitulo = (veiculo['titulo'] ?? 'anuncio').toString();
+                            final messageText = 'Ola, vi seu anuncio no Dominus: $anuncioTitulo e gostaria de mais informacoes.';
+                            final message = Uri.encodeComponent(messageText);
+                            final whatsappUrl = 'https://wa.me/$formattedNumber?text=$message';
+
+                            final firstPhoto = fotos.isNotEmpty ? fotos.first : null;
+                            if (firstPhoto != null) {
+                              try {
+                                final imageFile = await _downloadShareImage(firstPhoto);
+                                await Share.shareXFiles(
+                                  [XFile(imageFile.path)],
+                                  text: messageText,
+                                );
+                                return;
+                              } catch (e) {
+                                print('Erro ao compartilhar imagem: $e');
+                              }
+                            }
                             
                             try {
                               final uri = Uri.parse(whatsappUrl);
@@ -321,8 +424,30 @@ class _DetalhesVeiculoPageState extends State<DetalhesVeiculoPage> {
                         },
                         onCompartilhar: () async {
                           final titulo = veiculo['titulo'] ?? 'Veículo';
-                          final link = 'https://domin.us/vehicle/$veiculoId'; // Link direto para o anúncio
+                          final link = _buildVehicleShareLink(veiculoId).toString();
                           final mensagem = 'Confira este anúncio: $titulo\n$link';
+                          debugPrint('Share link: $link');
+                          if (!mounted) return;
+
+                          final shouldShare = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Link para compartilhar'),
+                              content: SelectableText(link),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                                  child: const Text('Compartilhar'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (shouldShare != true) return;
                           
                           try {
                             await Share.share(mensagem, subject: titulo);

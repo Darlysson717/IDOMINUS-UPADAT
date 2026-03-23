@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'comprador_home.dart';
 import 'lojista_anuncios_page.dart';
+import 'widgets/app_bottom_nav.dart';
 
 class LojistasSeguidosPage extends StatefulWidget {
   const LojistasSeguidosPage({super.key});
@@ -196,9 +197,11 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
           : _lojistasSeguidos.isEmpty
               ? _buildEmptyState()
               : _buildContent(),
-  // BottomNavigationBar fixo para navegação
-      bottomNavigationBar: BottomNavigationBar(
+      // BottomNavigationBar fixo para navegação
+      bottomNavigationBar: AppBottomNav(
         currentIndex: 2,
+        selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
+        unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : Colors.grey,
         onTap: (index) {
           if (index == 0) {
             Navigator.of(context).pushAndRemoveUntil(
@@ -211,26 +214,6 @@ class _LojistasSeguidosPageState extends State<LojistasSeguidosPage> {
             Navigator.of(context).pushNamed('/perfil');
           }
         },
-        selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
-        unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Favoritos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Lojistas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
       ),
     );
   }

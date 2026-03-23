@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.example.triunviratoCarMarketplace",
+        "paths": [
+          "/vehicle/*",
+          "/seller/*",
+          "/seller_redirect.html"
+        ]
+      }
+    ]
+  }
+}

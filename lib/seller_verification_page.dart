@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/cnpj_validator.dart';
+import 'package:flutter/foundation.dart';
 import '../services/seller_verification_service.dart';
 import '../models/seller_verification.dart';
 import '../services/admin_service.dart';
@@ -379,9 +380,11 @@ class _SellerVerificationPageState extends State<SellerVerificationPage> {
     if (pickedFile != null) {
       setState(() => _isLoading = true);
       try {
+        final bytes = kIsWeb ? await pickedFile.readAsBytes() : null;
         final url = await _verificationService.uploadDocumento(
           pickedFile.path,
           pickedFile.name,
+          bytes: bytes,
         );
         setState(() {
           _documentoUrl = url;

@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
@@ -27,6 +28,7 @@ import 'services/analytics_service.dart';
 import 'business_ads_page.dart';
 import 'services/profile_service.dart';
 import 'lojista_anuncios_page.dart';
+import 'widgets/app_bottom_nav.dart';
 
 /// Tela de Perfil com Drawer lateral esquerdo
 class PerfilPage extends StatefulWidget {
@@ -476,9 +478,11 @@ class _PerfilPageState extends State<PerfilPage> {
           ],
         ),
   ),
-  // BottomNavigationBar fixo para navegação
-      bottomNavigationBar: BottomNavigationBar(
+      // BottomNavigationBar fixo para navegação
+      bottomNavigationBar: AppBottomNav(
         currentIndex: 3,
+        selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
+        unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : Colors.grey,
         onTap: (index) {
           if (index == 0) {
             Navigator.of(context).pushAndRemoveUntil(
@@ -491,26 +495,6 @@ class _PerfilPageState extends State<PerfilPage> {
             Navigator.of(context).pushNamed('/lojistas');
           }
         },
-        selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.deepPurple,
-        unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Favoritos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Lojistas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
       ),
     );
   }
@@ -648,7 +632,11 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  String _buildSellerShareLink(String userId) => 'dominus://seller/$userId';
+  String _buildSellerShareLink(String userId) => Uri.https(
+        'darlysson717.github.io',
+        '/DOMINUSWEB/seller_redirect.html',
+        {'seller': userId},
+    ).replace(fragment: 'seller=$userId').toString();
 
   Future<void> _exportSellerQrAsPdf(
     BuildContext context, {
@@ -859,20 +847,26 @@ class _PerfilPageState extends State<PerfilPage> {
             label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () async {
-              try {
-                await UpdateService.openUpdateLink(updateInfo['apkUrl']);
-                if (context.mounted) Navigator.of(context).pop();
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erro ao abrir a página de atualização: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+            onPressed: kIsWeb
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Atualizações não disponíveis na web. Use o app mobile.')),
+                    );
+                  }
+                : () async {
+                    try {
+                      await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+                      if (context.mounted) Navigator.of(context).pop();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erro ao abrir a página de atualização: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
             },
             child: const Text('Atualizar'),
           ),
@@ -903,7 +897,7 @@ class _PerfilPageState extends State<PerfilPage> {
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Apagar Conta'),
-            ),
+      ),
           ],
         );
       },

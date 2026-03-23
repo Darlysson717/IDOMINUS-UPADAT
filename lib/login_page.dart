@@ -108,16 +108,22 @@ class _LoginPageState extends State<LoginPage>
             child: const Text('Depois'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              try {
-                await UpdateService.downloadAndInstallUpdate(
-                  updateInfo['apkUrl'],
-                );
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              } catch (error) {
-                if (!context.mounted) return;
+            onPressed: kIsWeb
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Atualizações não disponíveis na web. Use o app mobile.')),
+                    );
+                  }
+                : () async {
+                    try {
+                      await UpdateService.downloadAndInstallUpdate(
+                        updateInfo['apkUrl'],
+                      );
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    } catch (error) {
+                      if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Erro ao abrir a atualização: $error'),
@@ -142,7 +148,7 @@ class _LoginPageState extends State<LoginPage>
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'io.supabase.flutter://callback',
+        redirectTo: kIsWeb ? 'https://darlysson717.github.io/DOMINUSWEB/' : 'io.supabase.flutter://callback',
       );
       _startSessionPolling();
     } catch (error, stack) {

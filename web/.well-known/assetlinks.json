@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.triunvirato_car_marketplace",
+      "sha256_cert_fingerprints": [
+        "4E:65:0E:DD:26:AB:EE:C5:34:78:DE:78:E9:86:C2:5B:FA:3F:A4:E7:A1:D4:40:BF:02:0B:CB:DE:B7:B0:2A:A8"
+      ]
+    }
+  }
+]

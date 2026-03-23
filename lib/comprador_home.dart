@@ -15,6 +15,7 @@ import 'widgets/skeleton_widgets.dart';
 import 'services/update_service.dart';
 import 'services/business_ads_service.dart';
 import 'widgets/business_ad_card.dart';
+import 'widgets/app_bottom_nav.dart';
 
 String removeAccents(String str) {
   const accents = 'àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ';
@@ -194,20 +195,26 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
             label: const Text('Sair do App', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () async {
-              try {
-                await UpdateService.openUpdateLink(updateInfo['apkUrl']);
-                if (context.mounted) Navigator.of(context).pop();
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erro ao abrir a página de atualização: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+            onPressed: kIsWeb
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Atualizações não disponíveis na web. Use o app mobile.')),
+                    );
+                  }
+                : () async {
+                    try {
+                      await UpdateService.openUpdateLink(updateInfo['apkUrl']);
+                      if (context.mounted) Navigator.of(context).pop();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erro ao abrir a página de atualização: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
             },
             child: const Text('Atualizar'),
           ),
@@ -1033,14 +1040,11 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
                 ),
               ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: surfaceColor,
-        elevation: 14,
+      bottomNavigationBar: AppBottomNav(
         currentIndex: _selectedIndex,
+        backgroundColor: surfaceColor,
         selectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : primaryColor,
         unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.6) : primaryColor.withValues(alpha: 0.4),
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         onTap: (index) {
           if (index == 0) {
             if (mounted) setState(() => _selectedIndex = 0);
@@ -1059,24 +1063,6 @@ class _CompradorHomeState extends State<CompradorHome> with WidgetsBindingObserv
             );
           }
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Favoritos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Lojistas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
       ),
     );
   }

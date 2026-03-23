@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'payment_page.dart';
@@ -21,7 +21,7 @@ class _CreateAdPageState extends State<CreateAdPage> {
   final TextEditingController _whatsappController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _creativeTextController = TextEditingController();
-  File? _selectedImage;
+  XFile? _selectedImage;
 
   final List<Map<String, dynamic>> _adTypes = [
     {
@@ -144,7 +144,7 @@ class _CreateAdPageState extends State<CreateAdPage> {
 
     if (image != null) {
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = image;
       });
     }
   }
@@ -299,9 +299,19 @@ class _CreateAdPageState extends State<CreateAdPage> {
                 child: _selectedImage != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
+                        child: FutureBuilder<Uint8List>(
+                          future: _selectedImage!.readAsBytes(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            return Image.memory(
+                              snapshot.data!,
+                              fit: BoxFit.cover,
+                            );
+                          },
                         ),
                       )
                     : Column(

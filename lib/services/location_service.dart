@@ -43,6 +43,11 @@ class LocationService with ChangeNotifier {
   }
 
   Future<void> openAppSettings() async {
+    if (kIsWeb) {
+      _erro = 'Abra as configurações do navegador para permitir localização.';
+      notifyListeners();
+      return;
+    }
     await perm.openAppSettings();
   }
 
@@ -75,18 +80,28 @@ class LocationService with ChangeNotifier {
         return;
       }
       _lat = pos.latitude; _lon = pos.longitude;
-      final placemarks = await geo.placemarkFromCoordinates(_lat!, _lon!);
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        // Alguns provedores retornam em administrativeArea / subAdministrativeArea
-        final cidadeRaw = p.subAdministrativeArea?.isNotEmpty == true ? p.subAdministrativeArea : p.locality;
-        final ufRaw = p.administrativeArea;
-        if (cidadeRaw != null) {
-          _cidade = cidadeRaw.split(RegExp(r'\s+')).map((w){final l=w.toLowerCase();return l.isEmpty?'' : l[0].toUpperCase()+l.substring(1);}).join(' ');
+      try {
+        final placemarks = await geo.placemarkFromCoordinates(_lat!, _lon!);
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          // Alguns provedores retornam em administrativeArea / subAdministrativeArea
+          final cidadeRaw = p.subAdministrativeArea?.isNotEmpty == true ? p.subAdministrativeArea : p.locality;
+          final ufRaw = p.administrativeArea;
+          if (cidadeRaw != null) {
+            _cidade = cidadeRaw
+                .split(RegExp(r'\s+'))
+                .map((w) {
+                  final l = w.toLowerCase();
+                  return l.isEmpty ? '' : l[0].toUpperCase() + l.substring(1);
+                })
+                .join(' ');
+          }
+          if (ufRaw != null && ufRaw.length <= 3) {
+            _uf = ufRaw.toUpperCase();
+          }
         }
-        if (ufRaw != null && ufRaw.length <= 3) {
-          _uf = ufRaw.toUpperCase();
-        }
+      } catch (e) {
+        _erro = 'Falha ao converter coordenadas em cidade/UF.';
       }
     } catch (e) {
       _erro = 'Falha localização: $e';

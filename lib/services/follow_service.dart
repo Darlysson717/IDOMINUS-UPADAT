@@ -37,6 +37,18 @@ class FollowService {
       'user_id': user.id,
       'vendedor_id': sellerId,
     });
+
+    if (sellerId != user.id) {
+      try {
+        await _client.from('notificacoes').insert({
+          'user_id': sellerId,
+          'tipo': 'novo_seguidor',
+          'mensagem': 'Alguém começou a seguir sua loja.',
+        });
+      } catch (_) {
+        // Silenciar erro de notificação para não quebrar o follow
+      }
+    }
   }
 
   Future<void> unfollowSeller(String sellerId) async {
